@@ -5,7 +5,7 @@ export function newGame(names, previous = null) {
   if (!players.length || players.length > 6) throw Error('Bitte ein bis sechs Namen eingeben.');
   const deck = ['♥','♣','♠','♦'].flatMap(suit=>ranks.map(rank=>({suit,rank})));
   for (let i=deck.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1)); [deck[i],deck[j]]=[deck[j],deck[i]]; }
-  return {version:1,players,deck,turn:previous?.turn ?? 0,kings:0,question:null,thumb:null,thumbUses:0,pending:null,mode:null,card:null,over:false,round:(previous?.round ?? 0)+1,log:previous?.log.slice() ?? [],message:'Bereit? Zieht die erste Karte.'};
+  return {version:1,players,deck,turn:previous?.turn ?? 0,kings:0,question:null,thumb:null,thumbUses:0,pending:null,mode:null,card:null,over:false,round:(previous?.round ?? 0)+1,log:previous?.log.slice() ?? [],categoryResults:previous?.categoryResults?.slice() ?? [],category:'',message:'Bereit? Zieht die erste Karte.'};
 }
 function count(map,key) { map[key]=(map[key]||0)+1; }
 function penalty(s,i,kind,amount,source=s.turn) { const p=s.players[i]; p.score+=amount; count(p.received,kind); const giver=s.players[source]; if(giver) { giver.distributed ||= {}; count(giver.distributed,kind); } s.log.push(`${p.name}: ${kind}, +${amount} Schluck${amount===1?'':'e'}`); }
@@ -40,6 +40,12 @@ export function selectMode(s,mode) {
 export function assign(s,i) {
   if(s.over || !s.players[i]) return false;
   const kind=s.mode||s.pending; if(!kind) return false;
+  if(kind==='Dame') {
+    s.categoryResults ||= [];
+    s.categoryResults.push({round:s.round,card:32-s.deck.length,category:s.category||'',loser:s.players[i].name,giver:s.players[s.turn].name});
+    s.log.push(`Kategorie: ${s.category||'(ohne Namen)'} – ${s.players[i].name} verliert`);
+    s.category='';
+  }
   const source=s.mode==='Bube'?s.question:s.mode==='10'?s.thumb:s.turn;
   const p=s.players[i]; penalty(s,i,kind,kind==='10'?1:Math.min(8,16-p.score%16),source);
   if(s.mode==='Bube') s.question=null;

@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {newGame,draw,assign,selectMode} from '../engine.mjs';
+test('category result includes optional title and losing player',()=>{const s=newGame(['A','B']);s.deck=[{rank:'Dame',suit:'♥'}];draw(s);s.category='Filme';assign(s,1);assert.deepEqual(s.categoryResults[0],{round:1,card:32,category:'Filme',loser:'B',giver:'A'});});
 test('distributed penalties belong to the card giver and title holder',()=>{
   const s=newGame(['A','B','C']);
   s.deck=[{suit:'♥',rank:'Bube'}]; draw(s);
