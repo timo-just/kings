@@ -26,9 +26,7 @@ jobs:
         with:
           enablement: true
       - name: Prepare website
-        run: |
-          mkdir _site
-          cp index.html style.css app.mjs engine.mjs icon.png _site/
+        run: node prepare-site.mjs
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
