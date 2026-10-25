@@ -4,6 +4,8 @@ export let language=current==='en'?'en':'de';
 export function setLanguage(value){language=value==='en'?'en':'de';try{localStorage.setItem('kings-language',language);}catch{}if(typeof document!=='undefined')document.documentElement.lang=language;}
 export const locale=()=>language==='en'?'en-GB':'de-DE';
 const pairs={
+ 'Nutzung übrig':'use left',
+ 'Du bist Daumenkönig':'You are the thumb king','Du bist Fragekönig':'You are the question king','Nutzungen übrig':'uses left','Wen hat es erwischt?':'Who got caught?','Strafe vergeben':'Penalty assigned','Neue geheime Rolle vergeben.':'A new secret role has been assigned.','Diese Rolle ist nicht mehr verfügbar oder die Auswahl ist ungültig.':'This role is no longer available or the selection is invalid.','Bitte den persönlichen Spielerlink verwenden.':'Please use your personal player link.',
  'Hauptmenü':'Main menu','Sprache':'Language','Dein nächster Spieleabend':'Your next game night','Spielraum erstellen, persönliche Links verschicken und gemeinsam spielen.':'Create a room, share personal links and play together.','Link kopieren':'Copy link','Gläser':'glasses','Schlücke':'sips','Endstand:':'Final totals:',
  'Neues Spiel':'New game','Spiel fortsetzen':'Continue game','Private Historie':'Private history','Zurück zum Hauptmenü':'Back to main menu','Spielraum erstellen':'Create game room','Spieler einladen':'Invite players','Dein Spielleiterlink':'Your game leader link',
  'Wer spielt mit?':'Who is playing?','Bis zu sechs Personen. Leere Felder bleiben frei.':'Up to six players. Leave unused fields empty.','Bereit · Spiel starten':'Ready · Start game','Spieler ändern':'Edit players','Statistik':'Statistics','Spielraum':'Game room','Historie':'History','Nächste Karte':'Next card','Fragekönig':'Question king','Daumenkönig':'Thumb king','keiner':'nobody','Start':'Start','Kings:':'Kings:',
@@ -51,7 +53,7 @@ export function localize(root=document.body){
  document.documentElement.lang=language;
  const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node;
  while((node=walker.nextNode())){
-  if(node.parentElement?.closest('script,style,input,textarea,#turn,#personalName,#players,#comparison,#categoryQueue,#legend,#eventLog,#statsTitle,#roomName,#archiveList,#tables,#invitationList,#message,#outcome,#thumbOwner,#questionOwner'))continue;
+  if(node.parentElement?.closest('script,style,input,textarea,#turn,#personalName,#players,#comparison,#categoryQueue,#legend,#eventLog,#statsTitle,#roomName,#archiveList,#tables,#invitationList,#message,#outcome,#thumbOwner,#questionOwner,#personalRoles'))continue;
   const value=node.nodeValue,trim=value.trim();if(!trim)continue;
   const original=originals.get(node)||Object.keys(pairs).find(k=>pairs[k]===trim)||trim;if(!originals.has(node))originals.set(node,original);
   const translated=t(original);if(value.trim()!==translated)node.nodeValue=value.replace(trim,translated);

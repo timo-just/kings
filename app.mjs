@@ -21,7 +21,12 @@ $('menuHistory').onclick=()=>$('archiveOpen').click();
 $('languageSelect').value=language;
 $('languageSelect').onchange=e=>{setLanguage(e.target.value);if(!$('home').hidden)localize();else if(state)render();else localize();};
 $('draw').onclick=()=>act({type:'draw'});
-for(const [id,mode] of [['thumb','10'],['question','Bube']]) $(id).onclick=()=>act({type:'mode',mode});
+const roleReveal={thumb:false,question:false},roleTap={},roleTimers={};
+$('thumb').firstChild.nodeValue='Daumenkönig';
+for(const [id,mode] of [['thumb','10'],['question','Bube']]) $(id).onclick=()=>{
+  if(roleTap[id]){clearTimeout(roleTap[id]);roleTap[id]=null;roleReveal[id]=true;clearTimeout(roleTimers[id]);render();roleTimers[id]=setTimeout(()=>{roleReveal[id]=false;if(state&&!$('game').hidden)render();},2000);}
+  else roleTap[id]=setTimeout(()=>{roleTap[id]=null;act({type:'mode',mode});},320);
+};
 function render(){
   $('home').hidden=true;
   renderOnline();
@@ -31,9 +36,10 @@ function render(){
   $('turn').textContent=state.players[state.turn].name;
   const rank=cardRank(state.card?.rank);
   $('card').innerHTML=state.card?`<span class="corner">${escape(rank)}<br>${escape(state.card.suit)}</span><span class="card-suit">${escape(state.card.suit)}</span><span class="corner bottom">${escape(rank)}<br>${escape(state.card.suit)}</span>`:'<span class="card-suit">&#9819;</span>';$('card').classList.toggle('red',['♥','♦'].includes(state.card?.suit));
-  $('message').textContent=gameText(state.message);$('draw').disabled=!!(state.pending||state.mode);
+  $('message').textContent=gameText(/ist neuer (Fragekönig|Daumenkönig)/.test(state.message)?'Neue geheime Rolle vergeben.':state.message);$('draw').disabled=!!(state.pending||state.mode);
   $('thumbOwner').textContent=state.thumb===null?t('keiner'):`${state.players[state.thumb].name} (${state.thumbUses})`;
   $('questionOwner').textContent=state.question===null?t('keiner'):state.players[state.question].name;
+  $('thumbOwner').hidden=!roleReveal.thumb;$('questionOwner').hidden=!roleReveal.question;
   $('thumb').setAttribute('aria-pressed',state.mode==='10');$('question').setAttribute('aria-pressed',state.mode==='Bube');
   $('players').replaceChildren();state.players.forEach((p,i)=>{const b=document.createElement('button');b.style.setProperty('--player',colors[p.slot]);b.classList.toggle('current',i===state.turn);b.innerHTML=`${escape(p.name)}<small>${Math.floor(p.score/16)} ${t('Gläser')} · ${((16-p.score%16)*6.25).toLocaleString(locale())} %</small>`;b.setAttribute('aria-label',`${p.name}, ${p.score} ${t('Schlücke')}`);b.disabled=!!online&&roomView.role==='player';b.onclick=()=>act({type:'assign',player:i});$('players').append(b);});
   $('categoryEntry').hidden=state.pending!=='Dame'||!!online&&roomView.role==='player';
@@ -97,10 +103,21 @@ function renderOnline(){
   for(const id of ['draw','thumb','question'])$(id).hidden=player;
   $('lastRoom').hidden=!lastRoom();
   if(player){const p=state.players[roomView.me];$('personalName').textContent=p.name;$('personalScore').textContent=`${p.score} ${t('Schlücke')} · ${(p.score/16).toLocaleString(locale(),{maximumFractionDigits:2})} ${t('Gläser')}`;
+    renderPersonalRoles();
     $('comparison').innerHTML=state.players.map(q=>`<p style="--player:${colors[q.slot]}"><span class="dot"></span>${escape(q.name)} <strong>${q.score} ${t('Schlücke')}</strong></p>`).join('');
     renderQueue();
   }
   if(online){$('categorySuggestions').replaceChildren();roomView.categories.flat().forEach(name=>{const o=document.createElement('option');o.value=name;$('categorySuggestions').append(o);});}
+}
+function renderPersonalRoles(){
+  if(!$('personalRoles'))$('personalScore').insertAdjacentHTML('afterend','<div id="personalRoles" aria-live="polite"></div>');
+  $('personalRoles').replaceChildren();
+  for(const [kind,active,remaining,label]of [['10',state.thumb===roomView.me,state.thumbUses,'Du bist Daumenkönig'],['Bube',state.question===roomView.me,1,'Du bist Fragekönig']]){
+    if(!active||state.over)continue;const box=document.createElement('section');box.className='personal-role';
+    const h=document.createElement('h2');h.textContent=t(label);const count=document.createElement('p');count.textContent=`${remaining} ${t(remaining===1?'Nutzung übrig':'Nutzungen übrig')}`;const prompt=document.createElement('p');prompt.textContent=t('Wen hat es erwischt?');box.append(h,count,prompt);
+    state.players.forEach((p,index)=>{const b=document.createElement('button');b.textContent=p.name;b.onclick=async()=>{if(busy)return;busy=true;box.querySelectorAll('button').forEach(el=>el.disabled=true);try{applyOnline(await command({type:'useTitle',kind,player:index}));notice(t('Strafe vergeben'));}catch(e){notice(e.message);try{applyOnline(await request('/rooms/'+online.room));}catch{}}finally{busy=false;if(online)renderPersonalRoles();}};box.append(b);});
+    $('personalRoles').append(box);
+  }
 }
 function applyOnline(view){if(!online||view.room!==online.room)return;view=acceptView(view);state=view.state;render();$('edit').hidden=true;if($('statistics').open&&!archivedStatistics)refreshStats();}
 async function joinOnline(ctx){await attach(ctx,applyOnline,notice);watchVisibility(applyOnline,notice);}

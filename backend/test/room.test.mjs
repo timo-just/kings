@@ -7,6 +7,18 @@ async function call(path,body,key='',device='host-device'){
   const res=await worker.fetch(req,env);return {status:res.status,data:await res.json()};
 }
 async function room(names=['Anna','Ben']){const r=await call('/rooms',{names});expect(r.status).toBe(201);return r.data;}
+it('only the title holder sees and uses their role, with exactly three or one uses',async()=>{
+ const r=await room();const stub=env.ROOMS.getByName(r.room);
+ await runInDurableObject(stub,instance=>{const m=instance.get();m.state.thumb=0;m.state.thumbUses=3;m.state.question=1;m.state.pending='Dame';m.state.category='Filme';instance.put(m);});
+ const a=(await call('/rooms/'+r.room,null,r.invitations[0])).data.state,b=(await call('/rooms/'+r.room,null,r.invitations[1])).data.state;
+ expect(a.thumb).toBe(0);expect(a.thumbUses).toBe(3);expect(a.question).toBe(null);expect(b.thumb).toBe(null);expect(b.thumbUses).toBe(0);expect(b.question).toBe(1);
+ expect((await call(`/rooms/${r.room}/action`,{type:'useTitle',kind:'10',player:0},r.invitations[1])).status).toBe(403);
+ for(let i=0;i<3;i++){const used=await call(`/rooms/${r.room}/action`,{type:'useTitle',kind:'10',player:1},r.invitations[0]);expect(used.status).toBe(200);expect(used.data.state.thumbUses).toBe(2-i);expect(used.data.state.pending).toBe('Dame');}
+ expect((await call(`/rooms/${r.room}/action`,{type:'useTitle',kind:'10',player:1},r.invitations[0])).status).toBe(403);
+ const used=await call(`/rooms/${r.room}/action`,{type:'useTitle',kind:'Bube',player:0},r.invitations[1]);expect(used.status).toBe(200);expect(used.data.state.question).toBe(null);expect(used.data.state.players[0].score).toBe(8);
+ expect((await call(`/rooms/${r.room}/action`,{type:'useTitle',kind:'Bube',player:0},r.invitations[1])).status).toBe(403);
+ const host=(await call('/rooms/'+r.room,null,r.hostToken)).data.state;expect(host.players[1].received['10']).toBe(3);expect(host.players[0].distributed['10']).toBe(3);expect(host.players[1].distributed.Bube).toBe(1);expect(host.category).toBe('Filme');
+});
 it('queues append, reorder, remove and consume the drawing players next category',async()=>{
  const r=await room();let revision=0;
  for(const category of ['Filme','Tiere','Städte']){const v=await call(`/rooms/${r.room}/action`,{type:'categoryQueue',operation:'add',category,revision},r.invitations[0]);expect(v.status).toBe(200);revision=v.data.revision;}

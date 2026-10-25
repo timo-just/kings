@@ -1,5 +1,5 @@
 import {DurableObject} from 'cloudflare:workers';
-import {newGame,draw,assign,selectMode} from '../engine.mjs';
+import {newGame,draw,assign,selectMode,useTitle} from '../engine.mjs';
 
 const origin='https://timo-just.github.io';
 const json=(data,status=200)=>Response.json(data,{status,headers:{'Access-Control-Allow-Origin':origin,'Cache-Control':'no-store','Vary':'Origin','X-Content-Type-Options':'nosniff'}});
@@ -38,6 +38,11 @@ export class KingsRoom extends DurableObject{
   event(m,kind,lines){this.sql.exec('INSERT INTO events(round,at,kind,data) VALUES(?,?,?,?)',m.state.round,new Date().toISOString(),kind,JSON.stringify({lines,scores:m.state.players.map(p=>p.score),category:m.state.categoryResults?.at(-1)||null}));}
   view(m,actor){
     const state=structuredClone(m.state);state.deck=Array(state.deck.length).fill(null);state.log=[];state.categoryResults=[];
+    if(actor.role==='player'){
+      if(state.question!==actor.me)state.question=null;
+      if(state.thumb!==actor.me){state.thumb=null;state.thumbUses=0;}
+      if(state.card&&['Bube','10'].includes(state.card.rank))state.message='Neue geheime Rolle vergeben.';
+    }
     const out={state,role:actor.role,me:actor.me,revision:m.revision,room:m.id,name:m.name,categories:m.categories};
     if(actor.role==='host'||actor.role==='owner'){out.invitations=m.playerTokens;out.controller=m.controller;}
     return out;
@@ -46,7 +51,10 @@ export class KingsRoom extends DurableObject{
   action(digest,owner,input,device){
     const m=this.get(),actor=this.role(m,digest,owner),s=m.state;
     if(!input||typeof input!=='object')fail('Ungültige Aktion.');
-    if(input.type==='categoryQueue'){
+    if(input.type==='useTitle'){
+      if(actor.role!=='player')fail('Bitte den persönlichen Spielerlink verwenden.',403);
+      if(!useTitle(s,actor.me,input.kind,input.player))fail('Diese Rolle ist nicht mehr verfügbar oder die Auswahl ist ungültig.',403);
+    }else if(input.type==='categoryQueue'){
       if(actor.role!=='player')fail('Nur Spieler können ihre eigene Warteschlange bearbeiten.',403);
       if(input.revision!==m.revision)fail('Die Warteschlange wurde aktualisiert. Bitte erneut versuchen.',409);
       const queue=m.categories[actor.me];

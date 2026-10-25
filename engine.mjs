@@ -55,3 +55,16 @@ export function assign(s,i) {
   s.message=`${p.name} trinkt (${kind}).${s.pending?' Die offene Karte muss noch vergeben werden.':''}`;
   return true;
 }
+export function useTitle(s,holder,kind,target){
+  if(s.over||!Number.isInteger(target)||!s.players[target])return false;
+  if(kind==='10'&&(s.thumb!==holder||s.thumbUses<=0))return false;
+  if(kind==='Bube'&&s.question!==holder)return false;
+  if(!['10','Bube'].includes(kind))return false;
+  const p=s.players[target];penalty(s,target,kind,kind==='10'?1:Math.min(8,16-p.score%16),holder);
+  if(kind==='Bube')s.question=null;
+  if(kind==='10'&&--s.thumbUses===0)s.thumb=null;
+  if(s.mode===kind&&((kind==='Bube'&&s.question===null)||(kind==='10'&&s.thumbUses===0)))s.mode=null;
+  s.players.forEach(p=>p.history[p.history.length-1]=p.score);
+  s.log.push(`${s.players[holder].name} gibt ${kind} an ${p.name}`);
+  return true;
+}

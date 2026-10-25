@@ -4,6 +4,10 @@ Ein SQLite-Durable-Object pro Spielraum, plus ein kleines Verzeichnis ausschlie�
 
 ## Zugriffe
 
+Frage- und Daumenkönig erhalten in ihrem persönlichen Spielerzugang eine hervorgehobene Rollenkarte mit Zielauswahl. Die Serveraktion `useTitle` prüft den aktuellen Inhaber und verbraucht genau eine Nutzung. Andere Teilnehmer erhalten keinen fremden Rollenstatus im Live-Spielstand. In der Spielleiterübersicht zeigen die Rollenknöpfe Namen und Restnutzungen erst nach schnellem Doppeltipp für zwei Sekunden; ein einzelner Tipp öffnet weiterhin die Strafauswahl für Spieler ohne Handy.
+
+Der Besitzerzugriff ist ein geheimer Zugangsschlüssel im Besitzerlink, kein persönliches Benutzerkonto. Der Browser speichert ihn lokal und sendet ihn im Authorization-Header. Der Server vergleicht dessen SHA-256 mit OWNER_HASH. Der Link darf deshalb nur dem Besitzer bekannt sein.
+
 - Zufälliger Spielleiterlink: steuert genau diesen Raum. Ein serverseitig gespeicherter Gerätebezeichner erlaubt nur einer Spielleitung gleichzeitig Aktionen. Eine ausdrückliche Übernahme löst das vorherige Gerät ab.
 - Zufälliger persönlicher Spielerlink: sieht den eigenen Stand und den Vergleich innerhalb dieses Raums, darf ausschließlich die eigenen Kategorien bearbeiten. Er darf keine Karten ziehen und keine Archivdateien öffnen.
 - Separater Besitzerschlüssel: zeigt alle Räume und exportiert einzelne Runden als JSON. Dieser Schlüssel gehört weder in GitHub noch in Teilnehmerlinks. Er wird im Browserfragment übergeben und anschließend aus der Adresse entfernt; API-Anfragen verwenden einen Authorization-Header.
