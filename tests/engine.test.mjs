@@ -1,6 +1,18 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {newGame,draw,assign,selectMode} from '../engine.mjs';
+test('distributed penalties belong to the card giver and title holder',()=>{
+  const s=newGame(['A','B','C']);
+  s.deck=[{suit:'♥',rank:'Bube'}]; draw(s);
+  s.deck=[{suit:'♣',rank:'8'}]; draw(s);
+  selectMode(s,'Bube'); assign(s,2);
+  assert.equal(s.players[0].distributed.Bube,1);
+  assert.equal(s.players[2].received.Bube,1);
+  assert.equal(s.players[1].distributed.Bube,undefined);
+  s.deck=[{suit:'♠',rank:'9'}]; draw(s);
+  assert.equal(s.players[2].distributed['9'],3);
+  s.players.forEach(p=>assert.equal(p.received['9'],1));
+});
 const card=(s,rank)=>{s.deck=[{suit:'♥',rank}];assert.ok(draw(s));};
 test('32 unique cards; valid setup',()=>{const s=newGame(['A','','B']);assert.equal(s.players.length,2);assert.equal(new Set(s.deck.map(c=>c.suit+c.rank)).size,32);assert.throws(()=>newGame([' ']));});
 test('7, 8 and 9 apply correct penalties and turns',()=>{const s=newGame(['A','B','C']);card(s,'7');assert.deepEqual(s.players.map(p=>p.score),[0,0,1]);card(s,'8');assert.deepEqual(s.players.map(p=>p.score),[0,1,1]);card(s,'9');assert.deepEqual(s.players.map(p=>p.score),[1,2,2]);});

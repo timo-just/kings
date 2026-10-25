@@ -1,14 +1,14 @@
 export const ranks = ['Ass','König','Dame','Bube','10','9','8','7'];
 export const colors = ['#668cff','#69df80','#ff7777','#f3db66','#62d9e5','#e67de5'];
 export function newGame(names, previous = null) {
-  const players = previous ? structuredClone(previous.players) : names.map((name, slot) => ({name:name.trim(),slot,score:0,drawn:{},received:{},history:[0]})).filter(p=>p.name);
+  const players = previous ? structuredClone(previous.players) : names.map((name, slot) => ({name:name.trim(),slot,score:0,drawn:{},distributed:{},received:{},history:[0]})).filter(p=>p.name);
   if (!players.length || players.length > 6) throw Error('Bitte ein bis sechs Namen eingeben.');
   const deck = ['♥','♣','♠','♦'].flatMap(suit=>ranks.map(rank=>({suit,rank})));
   for (let i=deck.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1)); [deck[i],deck[j]]=[deck[j],deck[i]]; }
   return {version:1,players,deck,turn:previous?.turn ?? 0,kings:0,question:null,thumb:null,thumbUses:0,pending:null,mode:null,card:null,over:false,round:(previous?.round ?? 0)+1,log:previous?.log.slice() ?? [],message:'Bereit? Zieht die erste Karte.'};
 }
 function count(map,key) { map[key]=(map[key]||0)+1; }
-function penalty(s,i,kind,amount) { const p=s.players[i]; p.score+=amount; count(p.received,kind); s.log.push(`${p.name}: ${kind}, +${amount} Schluck${amount===1?'':'e'}`); }
+function penalty(s,i,kind,amount,source=s.turn) { const p=s.players[i]; p.score+=amount; count(p.received,kind); const giver=s.players[source]; if(giver) { giver.distributed ||= {}; count(giver.distributed,kind); } s.log.push(`${p.name}: ${kind}, +${amount} Schluck${amount===1?'':'e'}`); }
 function snapshot(s) { s.players.forEach(p=>p.history.push(p.score)); }
 export function draw(s) {
   if(s.over || s.pending || s.mode) return false;
@@ -40,7 +40,8 @@ export function selectMode(s,mode) {
 export function assign(s,i) {
   if(s.over || !s.players[i]) return false;
   const kind=s.mode||s.pending; if(!kind) return false;
-  const p=s.players[i]; penalty(s,i,kind,kind==='10'?1:Math.min(8,16-p.score%16));
+  const source=s.mode==='Bube'?s.question:s.mode==='10'?s.thumb:s.turn;
+  const p=s.players[i]; penalty(s,i,kind,kind==='10'?1:Math.min(8,16-p.score%16),source);
   if(s.mode==='Bube') s.question=null;
   if(s.mode==='10' && --s.thumbUses===0) s.thumb=null;
   if(s.mode) s.mode=null; else s.pending=null;
