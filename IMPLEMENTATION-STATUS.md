@@ -1,23 +1,15 @@
-# Weiterarbeit: Kings Mehrgeräte-Spiel
+# Kings Veröffentlichung
 
-Stand: 25.10.2026. Website: https://timo-just.github.io/kings/ ; Repository: timo-just/kings.
+Stand: 25.10.2026.
 
-## Vorgabe des Besitzers
+Website: https://timo-just.github.io/kings/
+API: https://kings-api.timo-just.workers.dev
+Cloudflare-Worker: kings-api im Konto 07bff9283b4d6430a11c34832585b7ae.
 
-Kein kostenpflichtiges Abo, kein Tarif-Upgrade und keine Abrechnungsrechte anfordern. Bereitstellung nur für Workers Free; keine Änderung von Subscriptions oder Billing. Leserechte reichen nicht für die Bereitstellung. Der benötigte OAuth-Scope ist workers-scripts.write.
+Der Worker wurde mit SQLite-Durable-Objects bereitgestellt. Die Oberfläche umfasst persönliche Spielerlinks, ein aktives Spielleitergerät, Live-Synchronisierung, Kategorienvorschläge und optionale Kategoriennamen, private Rundenhistorie sowie Statistikdateien als JSON. Der Besitzerzugriff wird über einen separaten privaten Schlüssel geschützt, dessen SHA-256 im Worker-Binding OWNER_HASH liegt. Schlüssel niemals in GitHub speichern oder bei späteren Deployments ersetzen.
 
-## Fertig vorbereitet
+Es wurde kein kostenpflichtiges Abo abgeschlossen und kein Tarif verändert. Weiterhin keine Billing-Rechte anfordern oder Tarifwechsel vornehmen.
 
-Frontend und Backend in diesem Branch: persönliche Spielerlinks, ein aktives Spielleitergerät, WebSocket-Synchronisierung, Kategorienvorschläge, optionale Kategoriennamen und protokollierte Verlierer, beständige Räume mit mehreren Runden, private Rundenhistorie und JSON-Dateiexport mit Einzelrunden- und Gesamtstatistiken. Ass-Karten zeigen A. Lokales Spiel ohne Server und Spieler ohne Handy bleiben möglich.
+Geprüft: 8 Engine-Tests, 6 lokale Cloudflare-Integrationstests und echte Live-API-Tests für Teilnehmerrechte, Archivschutz, Besitzerzugriff, Kategorien und WebSocket-Übertragung. Ein Spielraum mit Namen Veröffentlichungstest bleibt als gekennzeichneter Prüfdatensatz in der privaten Historie erhalten.
 
-Prüfungen: 8 Engine-Tests und 6 Integrationstests mit der offiziellen Cloudflare-Vitest-Laufzeit bestanden. Lokaler Browser-Test in tests/browser-qa.html bestand für A, lokales Spielen, Statistik-Tabs, Tabellen und optionale Kategorien.
-
-## Veröffentlichung noch offen
-
-Der Worker kings-api wurde NICHT bereitgestellt. Cloudflare-Konto: 07bff9283b4d6430a11c34832585b7ae; workers.dev-Subdomain: timo-just. Die CLI-OAuth-Anmeldung mit workers-scripts.write wurde bestätigt, die in diesem Chat laufende MCP-Verbindung gab beim Upload jedoch weiterhin 403 (fehlender workers-scripts.write Scope) zurück. Cloudflare-MCP-Verbindung beziehungsweise die gesamte Codex-Anwendung neu laden, dann mit dem angemeldeten Nutzer prüfen. Keine weitere pauschale Vollfreigabe anfordern.
-
-Das Backend-README beschreibt Module und Bindings. Einen neuen zufälligen Besitzerschlüssel erst für die erste erfolgreiche Bereitstellung erzeugen, nur dessen SHA-256 als OWNER_HASH binden und den privaten Besitzerlink dem Nutzer direkt übergeben. Niemals Schlüssel in GitHub speichern. Falls der Worker bereits existiert, vorhandene Bindings und Besitzerzugriff erhalten.
-
-Vor einem Merge des Branches: Worker veröffentlichen und workers.dev für kings-api aktivieren; Endpunkt /health und echten Mehrgeräte-Ablauf prüfen. Dann diesen Branch nach main bringen und Pages-Veröffentlichung prüfen. Die Hauptwebsite hat bis dahin den bisherigen lokalen Spielmodus.
-
-Die Cloudflare-Anmeldung enthält absichtlich keine Billing-Rechte. Das Konto-Abo konnte deshalb nicht per Billing-API gelesen werden. Falls der Tarif nicht durch einen anderen zugelassenen reinen Leseweg verifiziert werden kann, den Besitzer lediglich bestätigen lassen, dass Workers Free eingestellt ist; niemals einen Tarif wechseln.
+Die Veröffentlichung der Oberfläche erfolgt über den Pages-Workflow bei Änderungen an main. Bei späteren Backend-Änderungen vorhandene Bindings, SQLite-Klassen und OWNER_HASH erhalten; Backend-Tests und README unter backend/.
