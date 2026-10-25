@@ -15,7 +15,7 @@ function render(){
   if(state.over){results();return;}
   $('kings').textContent=`Kings: ${state.kings}/4`;$('remaining').textContent=`${32-state.deck.length}/32`;
   $('turn').textContent=state.players[state.turn].name;
-  $('card').innerHTML=state.card?`<span class="corner">${state.card.rank}<br>${state.card.suit}</span><span class="card-suit">${state.card.suit}</span><span class="corner bottom">${state.card.rank}<br>${state.card.suit}</span>`:'<span class="card-suit">&#9819;</span>';$('card').classList.toggle('red',['♥','♦'].includes(state.card?.suit));
+  $('card').innerHTML=state.card?`<span class="corner">${state.card.rank==='Ass'?'A':state.card.rank}<br>${state.card.suit}</span><span class="card-suit">${state.card.suit}</span><span class="corner bottom">${state.card.rank==='Ass'?'A':state.card.rank}<br>${state.card.suit}</span>`:'<span class="card-suit">&#9819;</span>';$('card').classList.toggle('red',['♥','♦'].includes(state.card?.suit));
   $('message').textContent=state.message;$('draw').disabled=!!(state.pending||state.mode);
   $('thumbOwner').textContent=state.thumb===null?'keiner':`${state.players[state.thumb].name} (${state.thumbUses})`;
   $('questionOwner').textContent=state.question===null?'keiner':state.players[state.question].name;
