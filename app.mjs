@@ -1,0 +1,42 @@
+import {newGame,draw,assign,selectMode,colors,ranks} from './engine.mjs';
+const $=id=>document.getElementById(id), key='kings-browser-v1';
+let state=null;
+try { const saved=JSON.parse(localStorage.getItem(key)); if(saved?.version===1 && saved.players?.length && Array.isArray(saved.deck)) state=saved; } catch {}
+const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+for(let i=0;i<6;i++) { const label=document.createElement('label'); label.style.setProperty('--player',colors[i]); label.innerHTML=`<span class="dot" aria-hidden="true"></span><input aria-label="Spieler ${i+1}" placeholder="Player ${i+1} Name" maxlength="40" autocomplete="off">`; $('fields').append(label); }
+function save(){try{localStorage.setItem(key,JSON.stringify(state));}catch{}}
+function openSetup(){ $('setup').hidden=false;$('game').hidden=true;$('results').hidden=true;$('edit').hidden=true;$('resume').hidden=!state; $('fields').querySelectorAll('input').forEach((el,i)=>el.value=state?.players.find(p=>p.slot===i)?.name||''); }
+$('names').onsubmit=e=>{e.preventDefault(); if(state && !confirm('Neue Spieler beginnen eine neue Partie. Bisherigen Spielstand ersetzen?'))return; try{state=newGame([...$('fields').querySelectorAll('input')].map(el=>el.value));$('error').textContent='';save();render();}catch(err){$('error').textContent=err.message;}};
+$('resume').onclick=()=>render();$('edit').onclick=openSetup;
+$('draw').onclick=()=>{draw(state);save();render();};
+for(const [id,mode] of [['thumb','10'],['question','Bube']]) $(id).onclick=()=>{selectMode(state,mode);save();render();};
+function render(){
+  $('setup').hidden=true;$('edit').hidden=false;$('game').hidden=state.over;$('results').hidden=!state.over;
+  if(state.over){results();return;}
+  $('kings').textContent=`Kings: ${state.kings}/4`;$('remaining').textContent=`${32-state.deck.length}/32`;
+  $('turn').textContent=state.players[state.turn].name;
+  $('card').textContent=state.card?`${state.card.suit} ${state.card.rank}`:'Start';$('card').classList.toggle('red',['♥','♦'].includes(state.card?.suit));
+  $('message').textContent=state.message;$('draw').disabled=!!(state.pending||state.mode);
+  $('thumbOwner').textContent=state.thumb===null?'keiner':`${state.players[state.thumb].name} (${state.thumbUses})`;
+  $('questionOwner').textContent=state.question===null?'keiner':state.players[state.question].name;
+  $('thumb').setAttribute('aria-pressed',state.mode==='10');$('question').setAttribute('aria-pressed',state.mode==='Bube');
+  $('players').replaceChildren();state.players.forEach((p,i)=>{const b=document.createElement('button');b.style.setProperty('--player',colors[p.slot]);b.classList.toggle('current',i===state.turn);b.innerHTML=`${escape(p.name)}<small>${Math.floor(p.score/16)} Gläser · ${((16-p.score%16)*6.25).toLocaleString('de-DE')} %</small>`;b.setAttribute('aria-label',`${p.name}, ${p.score} Schlücke, Strafe zuweisen`);b.onclick=()=>{if(assign(state,i)){save();render();}};$('players').append(b);});
+}
+function table(title,keys,field){return `<h2>${title}</h2><div class="table-wrap"><table><thead><tr><th>Karte</th>${state.players.map(p=>`<th>${escape(p.name)}</th>`).join('')}</tr></thead><tbody>${keys.map(k=>`<tr><th>${k}</th>${state.players.map(p=>`<td>${p[field][k]||0}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;}
+function results(){
+  $('outcome').textContent=state.message;$('totals').innerHTML=state.players.map(p=>`<p style="--player:${colors[p.slot]}">${escape(p.name)}: ${(p.score/16).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})} Gläser</p>`).join('');
+  $('tables').innerHTML=table('Karten gezogen',[...ranks].reverse(),'drawn')+table('Kassierte Strafen',['4. K','7','8','9','10','Bube','Dame','König','Ass'],'received');
+  const c=$('chart'),ctx=c.getContext('2d');ctx.fillStyle='#141218';ctx.fillRect(0,0,c.width,c.height);
+  const max=Math.max(16,...state.players.map(p=>p.score)),steps=Math.max(1,...state.players.map(p=>p.history.length-1));
+  ctx.font='18px Arial';ctx.lineWidth=1;
+  const tick=Math.max(16,Math.ceil(max/16/8)*16);
+  for(let score=0;score<=max;score+=tick){const y=470-score/max*390;ctx.strokeStyle='#49454f';ctx.beginPath();ctx.moveTo(65,y);ctx.lineTo(930,y);ctx.stroke();ctx.fillStyle='#cac4d0';ctx.fillText(`${score/16}`,12,y+6);}
+  ctx.fillText('Gläser',10,30);ctx.fillText('Karten',855,515);
+  for(let t=0;t<=steps;t+=Math.max(1,Math.ceil(steps/8))){ctx.fillText(String(t),65+t/steps*860,500);}
+  state.players.forEach(p=>{ctx.strokeStyle=colors[p.slot];ctx.lineWidth=3;ctx.beginPath();p.history.forEach((v,i)=>{const x=65+i/steps*860,y=470-v/max*390;i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();});
+}
+function download(url,name){const a=document.createElement('a');a.href=url;a.download=name;a.click();}
+$('png').onclick=()=>download($('chart').toDataURL('image/png'),'kings_final.png');
+$('log').onclick=()=>{const blob=new Blob([state.log.join('\n')+'\n\nEndstand:\n'+state.players.map(p=>`${p.name}: ${(p.score/16).toFixed(2)} Gläser`).join('\n')],{type:'text/plain;charset=utf-8'});const url=URL.createObjectURL(blob);download(url,'kings_log.txt');setTimeout(()=>URL.revokeObjectURL(url),1000);};
+$('next').onclick=()=>{state=newGame([],state);save();render();};
+state?render():openSetup();
