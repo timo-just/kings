@@ -7,6 +7,25 @@ async function call(path,body,key='',device='host-device'){
   const res=await worker.fetch(req,env);return {status:res.status,data:await res.json()};
 }
 async function room(names=['Anna','Ben']){const r=await call('/rooms',{names});expect(r.status).toBe(201);return r.data;}
+it('queues append, reorder, remove and consume the drawing players next category',async()=>{
+ const r=await room();let revision=0;
+ for(const category of ['Filme','Tiere','Städte']){const v=await call(`/rooms/${r.room}/action`,{type:'categoryQueue',operation:'add',category,revision},r.invitations[0]);expect(v.status).toBe(200);revision=v.data.revision;}
+ let v=await call(`/rooms/${r.room}/action`,{type:'categoryQueue',operation:'move',index:2,to:0,revision,player:1},r.invitations[0]);expect(v.data.categories).toEqual([['Städte','Filme','Tiere'],[]]);revision=v.data.revision;
+ expect((await call(`/rooms/${r.room}/action`,{type:'categoryQueue',operation:'remove',index:0,revision:0},r.invitations[0])).status).toBe(409);
+ v=await call(`/rooms/${r.room}/action`,{type:'categoryQueue',operation:'remove',index:1,revision},r.invitations[0]);revision=v.data.revision;
+ await runInDurableObject(env.ROOMS.getByName(r.room),instance=>{const m=instance.get();m.state.deck=[{suit:'♣',rank:'Dame'}];instance.put(m);});
+ v=await call(`/rooms/${r.room}/action`,{type:'draw',revision},r.hostToken);expect(v.data.state.category).toBe('Städte');expect(v.data.categories).toEqual([['Tiere'],[]]);
+});
+it('only active host or owner can abort; deleted games lose links and archive records',async()=>{
+ const r=await room(),other=await room();
+ expect((await call(`/rooms/${r.room}/abort`,{confirm:'delete-room'},r.invitations[0])).status).toBe(403);
+ expect((await call(`/rooms/${r.room}/abort`,{confirm:'delete-room'},r.hostToken,'other-device')).status).toBe(403);
+ expect((await call(`/rooms/${r.room}/abort`,{},r.hostToken)).status).toBe(400);
+ expect((await call(`/rooms/${r.room}/abort`,{confirm:'delete-room'},r.hostToken)).data.deleted).toBe(true);
+ expect([404,410]).toContain((await call('/rooms/'+r.room,null,r.hostToken)).status);
+ expect((await call('/admin/rooms',null,'test-owner-only')).data.some(x=>x.id===r.room)).toBe(false);
+ expect((await call('/rooms/'+other.room,null,other.hostToken)).status).toBe(200);
+});
 it('isolates rooms and forbids participants from drawing or reading the archive',async()=>{
   const a=await room(),b=await room();
   const read=await call('/rooms/'+a.room,null,a.invitations[0]);expect(read.data.role).toBe('player');expect(read.data.me).toBe(0);expect(read.data.invitations).toBeUndefined();expect(read.data.hostToken).toBeUndefined();

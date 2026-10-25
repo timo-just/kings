@@ -12,6 +12,12 @@ Die Links sind Zugangsschlüssel: Wer einen persönlichen Link erhält, kann die
 
 ## Dauerhafte Historie
 
+In der privaten Historie öffnet „Ansehen“ eine gespeicherte Runde mit Graph, Kartentabellen und Protokoll. Die Werte werden relativ zum Anfang dieser Runde angezeigt. Bereits exportierte JSON-Dateien können im selben Fenster lokal geöffnet werden.
+
+Spieler können Kategorien einzeln an ihre Warteschlange anhängen, verschieben und entfernen. Bei einer Dame wird der erste Eintrag des ziehenden Spielers entnommen und als Kategorie vorgeschlagen. Leere oder manuell eingegebene Kategorien bleiben möglich.
+
+„Spiel abbrechen und löschen“ löscht nach ausdrücklicher Bestätigung den gesamten Spielraum mit allen Runden, Kategorien und Protokollen. Nur die aktive Spielleitung oder der Besitzer darf diese Aktion ausführen. Alle Teilnehmer werden abgemeldet; Einladungslinks werden ungültig. Andere Spielräume bleiben erhalten.
+
 Räume haben kein automatisches Ablaufdatum. Jede Aktion wird mit Datum und Uhrzeit als Ereignis gespeichert. Aktueller Spielstand, Ereignis und Rundenübersicht werden gemeinsam in einer SQL-Transaktion geschrieben. „Neue Runde“ behält Gesamtwerte, Raum-ID und Zugänge; jede Runde bekommt zusätzlich einen eigenen Datensatz mit Anfangswerten, Endwerten und Dateinamen `datum_uhrzeit_spieler1_spieler2_…` (Europe/Berlin). Der JSON-Export enthält Statistiken dieser Runde, Gesamtstatistiken und die Ereignisse einschließlich Kategorien und Verlierern. Der Export entsteht bei Abruf; keine unnötigen Kopien oder Bilddateien auf dem Server.
 
 Live-Nachrichten enthalten kompakte Spielstände statt der gesamten Historie. Statistikereignisse werden bei Bedarf seitenweise geladen, anschließend nur noch seit der letzten bekannten Ereignis-ID. Die Echtzeitverbindung verwendet WebSocket-Hibernation und wird bei verborgenem Browserfenster getrennt. Bilder werden nicht über den Worker übertragen.

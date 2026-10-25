@@ -1,6 +1,6 @@
 import {readFile,writeFile,mkdir,copyFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
-const files=['index.html','app.mjs','engine.mjs','style.css','network.mjs','multiplayer-ui.mjs'];
+const files=['index.html','app.mjs','engine.mjs','style.css','network.mjs','multiplayer-ui.mjs','archive-model.mjs'];
 const sources=await Promise.all(files.map(file=>readFile(new URL(file,import.meta.url),'utf8')));
 const version=createHash('sha256').update(sources.join('\n')).digest('hex').slice(0,10);
 const output=new URL('_site/',import.meta.url);

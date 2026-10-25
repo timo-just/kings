@@ -13,6 +13,7 @@ function filename(date,players){const d=new Intl.DateTimeFormat('sv-SE',{timeZon
 export class KingsIndex extends DurableObject{
   constructor(ctx,env){super(ctx,env);this.sql=ctx.storage.sql;this.sql.exec('CREATE TABLE IF NOT EXISTS rooms(id TEXT PRIMARY KEY,name TEXT,created TEXT)');}
   register(id,name,created){this.sql.exec('INSERT OR IGNORE INTO rooms VALUES(?,?,?)',id,name,created);}
+  unregister(id){this.sql.exec('DELETE FROM rooms WHERE id=?',id);}
   list(before='9999',limit=50){return this.sql.exec('SELECT * FROM rooms WHERE created < ? ORDER BY created DESC LIMIT ?',before,limit).toArray();}
 }
 export class KingsRoom extends DurableObject{
@@ -24,7 +25,7 @@ export class KingsRoom extends DurableObject{
     this.sql.exec('CREATE TABLE IF NOT EXISTS rounds(id INTEGER PRIMARY KEY, name TEXT, started TEXT, ended TEXT, summary TEXT, initial TEXT)');
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping','pong'));
   }
-  get(){const row=this.sql.exec('SELECT data FROM meta WHERE id=1').toArray()[0];if(!row)fail('Spielraum nicht gefunden.',404);return JSON.parse(row.data);}
+  get(){if(this.deleting)fail('Dieses Spiel wurde gelöscht.',410);const row=this.sql.exec('SELECT data FROM meta WHERE id=1').toArray()[0];if(!row)fail('Spielraum nicht gefunden.',404);return JSON.parse(row.data);}
   put(m){this.sql.exec('INSERT OR REPLACE INTO meta VALUES(1,?)',JSON.stringify(m));}
   role(m,digest,owner){if(owner)return {role:'owner',me:null};if(equal(m.hostHash,digest))return {role:'host',me:null};const me=m.playerHashes.findIndex(h=>equal(h,digest));if(me>=0)return {role:'player',me};fail('Dieser Einladungslink ist ungültig.',403);}
   initialize(id,names,credentials,device){
@@ -45,7 +46,17 @@ export class KingsRoom extends DurableObject{
   action(digest,owner,input,device){
     const m=this.get(),actor=this.role(m,digest,owner),s=m.state;
     if(!input||typeof input!=='object')fail('Ungültige Aktion.');
-    if(input.type==='categoryList'){
+    if(input.type==='categoryQueue'){
+      if(actor.role!=='player')fail('Nur Spieler können ihre eigene Warteschlange bearbeiten.',403);
+      if(input.revision!==m.revision)fail('Die Warteschlange wurde aktualisiert. Bitte erneut versuchen.',409);
+      const queue=m.categories[actor.me];
+      if(input.operation==='add'){const name=clean(input.category);if(!name)fail('Bitte eine Kategorie eingeben.');if(queue.length>=30)fail('Maximal 30 wartende Kategorien.');queue.push(name);}
+      else if(input.operation==='remove'||input.operation==='move'){
+        if(!Number.isInteger(input.index)||input.index<0||input.index>=queue.length)fail('Ungültiger Eintrag.');
+        if(input.operation==='remove')queue.splice(input.index,1);
+        else{if(!Number.isInteger(input.to)||input.to<0||input.to>=queue.length)fail('Ungültige Position.');queue.splice(input.to,0,queue.splice(input.index,1)[0]);}
+      }else fail('Ungültige Warteschlangen-Aktion.');
+    }else if(input.type==='categoryList'){
       if(actor.role!=='player')fail('Bitte den persönlichen Spielerlink verwenden.',403);
       if(!Array.isArray(input.categories)||input.categories.length>30)fail('Maximal 30 Kategorien.');
       m.categories[actor.me]=[...new Set(input.categories.map(v=>clean(v)).filter(Boolean))];
@@ -56,7 +67,7 @@ export class KingsRoom extends DurableObject{
         if(m.controller!==device)fail('Ein anderes Gerät leitet dieses Spiel. Übernimm zuerst ausdrücklich die Spielleitung.',409);
         if(input.revision!==m.revision)fail('Der Spielstand hat sich geändert. Bitte erneut versuchen.',409);
         let ok=true;
-        if(input.type==='draw')ok=draw(s);
+        if(input.type==='draw'){ok=draw(s);if(ok&&s.pending==='Dame'){s.category=m.categories[s.turn].shift()||'';}}
         else if(input.type==='assign'){if(!Number.isInteger(input.player)||!s.players[input.player])fail('Ungültiger Spieler.');ok=assign(s,input.player);}
         else if(input.type==='mode')ok=['10','Bube'].includes(input.mode)&&selectMode(s,input.mode);
         else if(input.type==='category'){if(s.pending!=='Dame')fail('Keine Kategorie offen.');s.category=clean(input.category);}
@@ -95,6 +106,14 @@ export class KingsRoom extends DurableObject{
   broadcast(m){for(const ws of this.ctx.getWebSockets()){try{ws.send(JSON.stringify(this.view(m,ws.deserializeAttachment())));}catch{ws.close(1011,'Verbindung beendet');}}}
   webSocketMessage(ws){ws.close(1008,'Bitte HTTP API für Aktionen verwenden.');}
   webSocketError(ws){ws.close(1011,'Verbindungsfehler');}
+  async abort(digest,owner,device){
+    const m=this.get(),actor=this.role(m,digest,owner);
+    if(actor.role!=='owner'&&(actor.role!=='host'||m.controller!==device))fail('Nur die aktive Spielleitung oder der Besitzer kann dieses Spiel löschen.',403);
+    this.deleting=true;
+    try{await this.ctx.storage.deleteAll();}catch(e){this.deleting=false;throw e;}
+    for(const ws of this.ctx.getWebSockets()){try{ws.send(JSON.stringify({deleted:true}));ws.close(1000,'Spiel gelöscht');}catch{}}
+    return {deleted:true};
+  }
 }
 export default {
   async fetch(request,env){
@@ -121,6 +140,8 @@ export default {
           await env.INDEX.getByName('catalogue').register(id,view.name,new Date().toISOString());
           return json({...view,hostToken},201);
         }
+        const abort=url.pathname.match(/^\/rooms\/([a-f0-9-]{36})\/abort$/);
+        if(abort){if(body.confirm!=='delete-room')fail('Löschbestätigung fehlt.');const result=await env.ROOMS.getByName(abort[1]).abort(digest,owner,device);await env.INDEX.getByName('catalogue').unregister(abort[1]);return json(result);}
         const match=url.pathname.match(/^\/rooms\/([a-f0-9-]{36})\/action$/);if(match){if(!device)fail('Gerätekennung fehlt.');return json(await env.ROOMS.getByName(match[1]).action(digest,owner,body,device));}
       }
       if(request.method==='GET'){
