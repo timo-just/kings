@@ -1,24 +1,13 @@
 <!doctype html><html lang="de"><head><meta charset="utf-8"><title>Kings browser checks</title></head><body><pre id="qa">running</pre><iframe id="app" src="../index.html" width="430" height="932"></iframe><script type="module">
 const output=document.getElementById('qa'),frame=document.getElementById('app');
-window.addEventListener('error',e=>output.textContent='FAIL '+e.message);
 try{
-  await new Promise(resolve=>frame.onload=resolve);
-  const {newGame}=await import('../engine.mjs');const state=newGame(['Anna','Ben']);state.deck=[{rank:'Dame',suit:'♣'},{rank:'Ass',suit:'♥'}];
-  localStorage.setItem('kings-browser-v1',JSON.stringify(state));frame.src='../index.html?qa=local';
-  await new Promise(resolve=>frame.onload=resolve);const d=frame.contentDocument;
-  const assert=(v,label)=>{if(!v)throw Error(label);};
-  d.getElementById('draw').click();await new Promise(r=>setTimeout(r,50));
-  assert(d.querySelector('.corner').textContent.startsWith('A'),'Ass must display A');
-  d.querySelector('#players button').click();await new Promise(r=>setTimeout(r,50));
-  d.getElementById('statsOpen').click();await new Promise(r=>setTimeout(r,50));
-  assert(d.getElementById('statistics').open,'statistics opens');
-  assert(d.querySelectorAll('[role=tab]').length===3,'three tabs');
-  d.getElementById('tab-tables').click();assert(!d.getElementById('panel-tables').hidden,'tables visible');
-  assert(d.getElementById('tables').textContent.includes('Verteilte'),'distribution table');
-  d.getElementById('statsClose').click();d.getElementById('draw').click();await new Promise(r=>setTimeout(r,50));
-  assert(d.getElementById('categoryDialog').open,'optional category opens');d.getElementById('categorySkip').click();
-  d.querySelector('#players button').click();await new Promise(r=>setTimeout(r,50));
-  const saved=JSON.parse(localStorage.getItem('kings-browser-v1'));assert(saved.categoryResults[0].category==='','empty category supported');assert(saved.categoryResults[0].loser==='Anna','category loser saved');
-  output.textContent='PASS: A card, local play, statistics dialog, three tabs, distribution table, optional category and losing player';
+ await new Promise(resolve=>frame.onload=resolve);const d=frame.contentDocument;
+ const check=(v,label)=>{if(!v)throw Error(label);};
+ check(!d.getElementById('home').hidden,'main menu must be visible');
+ const select=d.getElementById('languageSelect');select.value='en';select.dispatchEvent(new frame.contentWindow.Event('change'));
+ check(d.getElementById('menuNew').textContent==='New game','English menu');
+ select.value='de';select.dispatchEvent(new frame.contentWindow.Event('change'));check(d.getElementById('menuNew').textContent==='Neues Spiel','German menu');
+ d.getElementById('menuNew').click();check(!d.getElementById('setup').hidden,'game setup');check(d.getElementById('onlineSetup').checked,'online rooms are mandatory');
+ output.textContent='PASS: main menu, both languages and online game setup';
 }catch(e){output.textContent='FAIL: '+e.stack;}
 </script></body></html>

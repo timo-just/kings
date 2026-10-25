@@ -1,3 +1,4 @@
+import {locale} from './i18n.mjs';
 export function archiveView(archive){
   const initial=archive.initial||archive.summary.players.map(p=>({...p,score:0,drawn:{},distributed:{},received:{}}));
   const events=archive.events||[];
@@ -7,5 +8,5 @@ export function archiveView(archive){
     for(const field of ['drawn','distributed','received'])result[field]=Object.fromEntries(Object.entries(p[field]||{}).map(([k,n])=>[k,n-(base[field]?.[k]||0)]));
     return result;
   });
-  return {players,log:events.flatMap(e=>(e.data.lines||[]).map(line=>`${new Date(e.at).toLocaleString('de-DE')} · ${line}`)),categoryResults:events.filter(e=>e.kind==='assign'&&e.data.category).map(e=>e.data.category)};
+  return {players,log:events.flatMap(e=>(e.data.lines||[]).map(line=>`${new Date(e.at).toLocaleString(locale())} · ${line}`)),categoryResults:events.filter(e=>e.kind==='assign'&&e.data.category).map(e=>e.data.category)};
 }
