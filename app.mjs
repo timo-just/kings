@@ -3,7 +3,10 @@ import {addMultiplayerUI} from './multiplayer-ui.mjs';
 import {online,roomView,deviceId,contextFromLink,createRoom,attach,watchVisibility,command,eventPages,participantLink,hostLink,lastRoom,rememberedOwner,request,leave,acceptView} from './network.mjs';
 import {archiveView} from './archive-model.mjs';
 import {language,setLanguage,locale,t,gameText,cardRank,localize} from './i18n.mjs';
+import {timeline} from './timeline.mjs';
+import {renderHistoryChart,chartPng} from './history-chart.mjs';
 addMultiplayerUI();
+document.getElementById('game').insertAdjacentHTML('beforebegin','<section id="leaderOverview" hidden><div class="leader-heading"><h2>Deine Spielübersicht</h2><button id="leaderStats">Statistik öffnen</button></div><p id="leaderSummary"></p><div id="leaderScores"></div></section>');
 const $=id=>document.getElementById(id), key='kings-browser-v1';
 let state=null;
 try { const saved=JSON.parse(localStorage.getItem(key)); if(saved?.version===1 && saved.players?.length && Array.isArray(saved.deck)) state=saved; } catch {}
@@ -13,7 +16,7 @@ function save(){if(online)return;try{localStorage.setItem(key,JSON.stringify(sta
 function openSetup(){ $('home').hidden=true; $('setup').hidden=false;$('game').hidden=true;$('results').hidden=true;$('edit').hidden=true;$('roomOpen').hidden=!state;$('statsOpen').hidden=!state;$('resume').hidden=!state;$('lastRoom').hidden=!lastRoom(); $('fields').querySelectorAll('input').forEach((el,i)=>el.value=state?.players.find(p=>p.slot===i)?.name||''); }
 $('names').onsubmit=async e=>{e.preventDefault(); try{const names=[...$('fields').querySelectorAll('input')].map(el=>el.value);newGame(names);if($('onlineSetup').checked){const view=await createRoom(names);await joinOnline({room:view.room,key:view.hostToken});$('roomOpen').click();}else{leave();state=newGame(names);save();render();}$('error').textContent='';}catch(err){$('error').textContent=gameText(err.message);}};
 $('resume').onclick=()=>render();$('edit').onclick=openSetup;
-function showHome(){leave();state=null;for(const d of document.querySelectorAll('dialog[open]'))d.close();$('home').hidden=false;for(const id of ['setup','game','results','personal','connection','statsOpen','roomOpen','edit'])$(id).hidden=true;$('menuContinue').hidden=!lastRoom();$('languageSelect').value=language;localize();}
+function showHome(){leave();state=null;for(const d of document.querySelectorAll('dialog[open]'))d.close();$('home').hidden=false;for(const id of ['setup','game','results','personal','leaderOverview','connection','statsOpen','roomOpen','edit'])$(id).hidden=true;$('menuContinue').hidden=!lastRoom();$('languageSelect').value=language;localize();}
 $('homeOpen').onclick=showHome;
 $('menuNew').onclick=()=>{leave();state=null;openSetup();localize();};
 $('menuContinue').onclick=()=>joinOnline(lastRoom()).catch(e=>notice(e.message));
@@ -59,18 +62,11 @@ function statistics(data=state){
   $('legacy').textContent=data.players.some(p=>!p.distributed)?'Verteilte Strafen aus älteren Spielständen wurden noch nicht erfasst. Die Zählung beginnt mit diesem Update.':'';
   $('legend').innerHTML=data.players.map(p=>`<span style="--player:${colors[p.slot]}"><i></i>${escape(p.name)} · ${p.score} ${t('Schlücke')}</span>`).join('');
   $('eventLog').textContent=data.log.length?data.log.map((line,i)=>`${String(i+1).padStart(3,'0')}  ${translateLogLine(line)}`).join('\n'):t('Noch keine Karten gezogen.');
-  const c=$('chart'),ctx=c.getContext('2d');ctx.fillStyle='#141218';ctx.fillRect(0,0,c.width,c.height);
-  const max=Math.max(8,...data.players.map(p=>p.score)),steps=Math.max(1,...data.players.map(p=>p.history.length-1));
-  ctx.font='18px Arial';ctx.lineWidth=1;
-  const tick=Math.max(1,Math.ceil(max/8));
-  for(let score=0;score<=max;score+=tick){const y=470-score/max*390;ctx.strokeStyle='#49454f';ctx.beginPath();ctx.moveTo(65,y);ctx.lineTo(930,y);ctx.stroke();ctx.fillStyle='#cac4d0';ctx.fillText(`${score}`,12,y+6);}
-  ctx.fillText(t('Schlücke'),10,30);ctx.fillText(t('Verlauf')+' →',815,515);
-  for(let t=0;t<=steps;t+=Math.max(1,Math.ceil(steps/8))){ctx.fillText(String(t),65+t/steps*860,500);}
-  data.players.forEach(p=>{ctx.strokeStyle=colors[p.slot];ctx.lineWidth=3;ctx.beginPath();p.history.forEach((v,i)=>{const x=65+i/steps*860,y=470-v/max*390;i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();});
+  renderHistoryChart(data);
   localize();
 }
 function download(url,name){const a=document.createElement('a');a.href=url;a.download=name;a.click();}
-$('png').onclick=()=>download($('chart').toDataURL('image/png'),'kings_final.png');
+$('png').onclick=async()=>{try{const url=await chartPng();if(url)download(url,'kings_final.png');}catch(e){notice(e.message);}};
 $('log').onclick=()=>{const blob=new Blob([(shownStatistics||state).log.map(translateLogLine).join('\n')+'\n\n'+t('Endstand:')+'\n'+(shownStatistics||state).players.map(p=>`${p.name}: ${(p.score/16).toFixed(2)} ${t('Gläser')}`).join('\n')],{type:'text/plain;charset=utf-8'});const url=URL.createObjectURL(blob);download(url,'kings_log.txt');setTimeout(()=>URL.revokeObjectURL(url),1000);};
 $('next').onclick=()=>act({type:'next'});
 const tabs=['graph','tables','log'];
@@ -81,6 +77,7 @@ for(const [i,id] of tabs.entries()){
 }
 $('statsOpen').onclick=async()=>{try{await loadStatistics();archivedStatistics=false;$('statsTitle').textContent=t('Statistik');statistics();$('statistics').showModal();}catch(e){notice(e.message);}};
 $('statsClose').onclick=()=>$('statistics').close();
+$('leaderStats').onclick=()=>$('statsOpen').click();
 $('panel-log').append($('log'));
 let busy=false,lastCategoryPrompt='',ownerCredential=rememberedOwner(),archiveBefore=null,shownStatistics=null,archivedStatistics=false,queueBusy=false;
 function notice(message){$('connection').hidden=false;$('connection').textContent=gameText(message);}
@@ -99,6 +96,13 @@ async function act(input){
 }
 function renderOnline(){
   const player=!!online&&roomView.role==='player';
+  $('leaderOverview').hidden=!online||player;
+  if(online&&!player){
+    const total=state.players.reduce((n,p)=>n+p.score,0);
+    $('leaderSummary').textContent=`${t('Runde')} ${state.round} · ${32-state.deck.length}/32 ${t('Karten')} · ${total} ${t('Schlücke insgesamt')}`;
+    $('leaderScores').replaceChildren();
+    state.players.forEach((p,index)=>{const row=document.createElement('div');row.className='leader-player';row.style.setProperty('--player',colors[p.slot]);row.innerHTML=`<span>${escape(p.name)}${index===state.turn&&!state.over?' · '+t('am Zug'):''}</span><strong>${p.score} ${t('Schlücke')}</strong><small>${(p.score/16).toLocaleString(locale(),{maximumFractionDigits:2})} ${t('Gläser')}</small>`;$('leaderScores').append(row);});
+  }
   $('roomOpen').hidden=!state;$('personal').hidden=!player;$('connection').hidden=!online;$('edit').hidden=!!online;
   for(const id of ['draw','thumb','question'])$(id).hidden=player;
   $('lastRoom').hidden=!lastRoom();
@@ -127,7 +131,7 @@ $('categoryConfirm').onclick=()=>setCategory($('categoryDialogInput').value.trim
 $('categoryPreferences').onsubmit=async e=>{e.preventDefault();const name=$('categoryInput').value.trim();if(name&&await queueAction({operation:'add',category:name}))$('categoryInput').value='';};
 async function queueAction(action){if(queueBusy)return false;queueBusy=true;try{applyOnline(await command({type:'categoryQueue',...action}));notice('Warteschlange gespeichert');return true;}catch(e){notice(e.message);if(e.status===409)try{applyOnline(await request('/rooms/'+online.room));}catch{}return false;}finally{queueBusy=false;}}
 function renderQueue(){const queue=roomView.categories[roomView.me]||[];$('queueEmpty').hidden=queue.length>0;$('categoryQueue').replaceChildren();queue.forEach((name,index)=>{const li=document.createElement('li'),text=document.createElement('span');text.textContent=name;li.append(text);for(const [label,operation,to]of [['↑','move',index-1],['↓','move',index+1],['Löschen','remove',index]]){const b=document.createElement('button');b.type='button';b.textContent=t(label);b.setAttribute('aria-label',`${name}: ${label==='↑'?'nach oben':label==='↓'?'nach unten':'löschen'}`);b.disabled=operation==='move'&&(to<0||to>=queue.length);b.onclick=()=>queueAction({operation,index,to});li.append(b);}$('categoryQueue').append(li);});}
-async function loadStatistics(){if(!online)return;const events=await eventPages();state.log=events.flatMap(e=>e.data.lines.map(line=>`${new Date(e.at).toLocaleString(locale())} · ${line}`));state.players.forEach((p,i)=>p.history=events.map(e=>e.data.scores[i]??0));state.categoryResults=events.filter(e=>e.kind==='assign'&&e.data.category).map(e=>e.data.category);}
+async function loadStatistics(){if(!online)return;const events=await eventPages();state.log=events.flatMap(e=>e.data.lines.map(line=>`${new Date(e.at).toLocaleString(locale())} · ${line}`));state.players=timeline(state.players,events);state.categoryResults=events.filter(e=>e.kind==='assign'&&e.data.category).map(e=>e.data.category);}
 let statsLoading=false;async function refreshStats(){if(statsLoading)return;statsLoading=true;try{await loadStatistics();if(!archivedStatistics)statistics();}catch(e){notice(e.message);}finally{statsLoading=false;}}
 function copyLink(link){navigator.clipboard.writeText(link).then(()=>notice('Link kopiert')).catch(()=>{prompt('Link kopieren:',link);});}
 $('roomOpen').onclick=()=>{

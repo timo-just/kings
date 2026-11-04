@@ -35,9 +35,9 @@ export class KingsRoom extends DurableObject{
     this.ctx.storage.transactionSync(()=>{this.put(m);this.startRound(m);this.event(m,'start',[]);});return this.view(m,{role:'host',me:null});
   }
   startRound(m){const at=new Date().toISOString();this.sql.exec('INSERT INTO rounds(id,name,started,summary,initial) VALUES(?,?,?,?,?)',m.state.round,filename(at,m.state.players),at,JSON.stringify(m.state),JSON.stringify(m.state.players));}
-  event(m,kind,lines){this.sql.exec('INSERT INTO events(round,at,kind,data) VALUES(?,?,?,?)',m.state.round,new Date().toISOString(),kind,JSON.stringify({lines,scores:m.state.players.map(p=>p.score),category:m.state.categoryResults?.at(-1)||null}));}
+  event(m,kind,lines){this.sql.exec('INSERT INTO events(round,at,kind,data) VALUES(?,?,?,?)',m.state.round,new Date().toISOString(),kind,JSON.stringify({lines,scores:m.state.players.map(p=>p.score),penalties:m.state.penalties||[],category:m.state.categoryResults?.at(-1)||null}));}
   view(m,actor){
-    const state=structuredClone(m.state);state.deck=Array(state.deck.length).fill(null);state.log=[];state.categoryResults=[];
+    const state=structuredClone(m.state);state.deck=Array(state.deck.length).fill(null);state.log=[];state.categoryResults=[];state.penalties=[];
     if(actor.role==='player'){
       if(state.question!==actor.me)state.question=null;
       if(state.thumb!==actor.me){state.thumb=null;state.thumbUses=0;}
@@ -92,7 +92,7 @@ export class KingsRoom extends DurableObject{
       if(input.type==='next')this.startRound(m);
       this.sql.exec('UPDATE rounds SET summary=?, ended=? WHERE id=?',JSON.stringify(m.state),m.state.over?new Date().toISOString():null,m.state.round);
       // SQL events hold the complete time series; live state stays small over months.
-      m.state.players.forEach(p=>p.history=[p.score]);m.state.categoryResults=[];this.put(m);
+      m.state.players.forEach(p=>p.history=[p.score]);m.state.categoryResults=[];m.state.penalties=[];this.put(m);
     });
     this.broadcast(m);return this.view(m,actor);
   }

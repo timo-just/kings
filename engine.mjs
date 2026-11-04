@@ -8,7 +8,7 @@ export function newGame(names, previous = null) {
   return {version:1,players,deck,turn:previous?.turn ?? 0,kings:0,question:null,thumb:null,thumbUses:0,pending:null,mode:null,card:null,over:false,round:(previous?.round ?? 0)+1,log:previous?.log.slice() ?? [],categoryResults:previous?.categoryResults?.slice() ?? [],category:'',message:'Bereit? Zieht die erste Karte.'};
 }
 function count(map,key) { map[key]=(map[key]||0)+1; }
-function penalty(s,i,kind,amount,source=s.turn) { const p=s.players[i]; p.score+=amount; count(p.received,kind); const giver=s.players[source]; if(giver) { giver.distributed ||= {}; count(giver.distributed,kind); } s.log.push(`${p.name}: ${kind}, +${amount} Schluck${amount===1?'':'e'}`); }
+function penalty(s,i,kind,amount,source=s.turn,via='card') { const p=s.players[i]; p.score+=amount; count(p.received,kind); const giver=s.players[source]; if(giver) { giver.distributed ||= {}; count(giver.distributed,kind); } (s.penalties ||= []).push({player:i,kind,amount,source,via});s.log.push(`${p.name}: ${kind}, +${amount} Schluck${amount===1?'':'e'}`); }
 function snapshot(s) { s.players.forEach(p=>p.history.push(p.score)); }
 export function draw(s) {
   if(s.over || s.pending || s.mode) return false;
@@ -47,7 +47,7 @@ export function assign(s,i) {
     s.category='';
   }
   const source=s.mode==='Bube'?s.question:s.mode==='10'?s.thumb:s.turn;
-  const p=s.players[i]; penalty(s,i,kind,kind==='10'?1:Math.min(8,16-p.score%16),source);
+  const p=s.players[i]; penalty(s,i,kind,kind==='10'?1:Math.min(8,16-p.score%16),source,s.mode?'title':'card');
   if(s.mode==='Bube') s.question=null;
   if(s.mode==='10' && --s.thumbUses===0) s.thumb=null;
   if(s.mode) s.mode=null; else s.pending=null;
@@ -60,7 +60,7 @@ export function useTitle(s,holder,kind,target){
   if(kind==='10'&&(s.thumb!==holder||s.thumbUses<=0))return false;
   if(kind==='Bube'&&s.question!==holder)return false;
   if(!['10','Bube'].includes(kind))return false;
-  const p=s.players[target];penalty(s,target,kind,kind==='10'?1:Math.min(8,16-p.score%16),holder);
+  const p=s.players[target];penalty(s,target,kind,kind==='10'?1:Math.min(8,16-p.score%16),holder,'title');
   if(kind==='Bube')s.question=null;
   if(kind==='10'&&--s.thumbUses===0)s.thumb=null;
   if(s.mode===kind&&((kind==='Bube'&&s.question===null)||(kind==='10'&&s.thumbUses===0)))s.mode=null;

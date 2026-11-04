@@ -4,6 +4,8 @@ export let language=current==='en'?'en':'de';
 export function setLanguage(value){language=value==='en'?'en':'de';try{localStorage.setItem('kings-language',language);}catch{}if(typeof document!=='undefined')document.documentElement.lang=language;}
 export const locale=()=>language==='en'?'en-GB':'de-DE';
 const pairs={
+ 'Rechter Nachbar':'Right neighbour','Selbst trinken':'Drink yourself','Alle trinken':'Everyone drinks','Kategorie verloren':'Lost category','Vierter König':'Fourth king','Grund nicht gespeichert':'Reason not recorded',
+ 'Deine Spielübersicht':'Your game overview','Statistik öffnen':'Open statistics','Runde':'Round','Schlücke insgesamt':'total sips','am Zug':'current turn','Schluckverlauf mit Strafgründen':'Sip history with penalty reasons','Verlauf →':'Progress →','Punkt antippen: Spieler, Strafgrund und Schluckzahl anzeigen.':'Tap a point to see the player, penalty reason and number of sips.','7 Nachbar · 8 selbst · 9 alle · 10/👍 Daumenkönig · B/❓ Fragekönig · D Kategorie · 4K vierter König · A Ass':'7 neighbour · 8 yourself · 9 everyone · 10/👍 thumb king · B/❓ question king · D category · 4K fourth king · A ace',
  'Nutzung übrig':'use left',
  'Du bist Daumenkönig':'You are the thumb king','Du bist Fragekönig':'You are the question king','Nutzungen übrig':'uses left','Wen hat es erwischt?':'Who got caught?','Strafe vergeben':'Penalty assigned','Neue geheime Rolle vergeben.':'A new secret role has been assigned.','Diese Rolle ist nicht mehr verfügbar oder die Auswahl ist ungültig.':'This role is no longer available or the selection is invalid.','Bitte den persönlichen Spielerlink verwenden.':'Please use your personal player link.',
  'Hauptmenü':'Main menu','Sprache':'Language','Dein nächster Spieleabend':'Your next game night','Spielraum erstellen, persönliche Links verschicken und gemeinsam spielen.':'Create a room, share personal links and play together.','Link kopieren':'Copy link','Gläser':'glasses','Schlücke':'sips','Endstand:':'Final totals:',
@@ -53,7 +55,7 @@ export function localize(root=document.body){
  document.documentElement.lang=language;
  const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node;
  while((node=walker.nextNode())){
-  if(node.parentElement?.closest('script,style,input,textarea,#turn,#personalName,#players,#comparison,#categoryQueue,#legend,#eventLog,#statsTitle,#roomName,#archiveList,#tables,#invitationList,#message,#outcome,#thumbOwner,#questionOwner,#personalRoles'))continue;
+  if(node.parentElement?.closest('script,style,input,textarea,#turn,#personalName,#players,#comparison,#categoryQueue,#legend,#eventLog,#statsTitle,#roomName,#archiveList,#tables,#invitationList,#message,#outcome,#thumbOwner,#questionOwner,#personalRoles,#leaderScores,#leaderSummary,#reasonChartWrap,#reasonDetail,#reasonLegend'))continue;
   const value=node.nodeValue,trim=value.trim();if(!trim)continue;
   const original=originals.get(node)||Object.keys(pairs).find(k=>pairs[k]===trim)||trim;if(!originals.has(node))originals.set(node,original);
   const translated=t(original);if(value.trim()!==translated)node.nodeValue=value.replace(trim,translated);

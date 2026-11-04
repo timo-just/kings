@@ -1,5 +1,9 @@
 # Kings im Browser
 
+Die Spielleitung sieht eine eigene Übersicht mit Runde, Kartenfortschritt, Gesamtschlücken und Trinkmengen aller Spieler. Der Statistikgraph markiert jeden Schluckanstieg mit der Ursache: 7, 8, 9, 10/👍, B/❓, D, 4K oder A. Punkte lassen sich anklicken, um Spieler, Grund, Menge und Zeitpunkt anzuzeigen. Für lange Verläufe lässt sich der Graph horizontal verschieben; der PNG-Export enthält die Markierungen ebenfalls.
+
+Neue Ereignisse speichern Strafgründe strukturiert. Ältere Ereignisse werden anhand ihrer Protokollzeilen ausgewertet. Fehlt ein rekonstruierbarer Grund, erscheint ein Fragezeichen. Dies gilt für laufende Spiele und private Archivansichten.
+
 Der Start erfolgt über das Hauptmenü. Sprache wählen (Deutsch oder English), „Neues Spiel“ öffnen, Spielernamen eintragen und den Spielraum erstellen. Danach zeigt die Einladungsliste den eigenen Spielleiterlink und einen individuellen Link je Spieler. Die Links enthalten die gewählte Sprache; die Spielleitung verschickt nur die jeweiligen persönlichen Spielerlinks. Spieler ohne eigenes Gerät können weiter über das Spielleitergerät mitspielen.
 
 „Hauptmenü“ verlässt die aktuelle Ansicht. „Spiel fortsetzen“ verbindet erneut mit dem zuletzt verwendeten Spielraum. Bestehende Einladungslinks bleiben gültig. Die Sprachwahl wird auf dem jeweiligen Gerät gespeichert. Namen und eigene Kategorien bleiben unverändert.

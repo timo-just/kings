@@ -62,6 +62,8 @@ it('records optional category and loser; persists scores and complete round file
   action=await call(`/rooms/${r.room}/action`,{type:'assign',player:1,revision:2},r.hostToken);expect(action.status).toBe(200);expect(action.data.state.players[1].score).toBe(8);
   const loaded=await call('/rooms/'+r.room,null,r.invitations[1]);expect(loaded.data.state.players[1].score).toBe(8);
   const events=await call(`/rooms/${r.room}/stats`,null,r.hostToken);expect(events.data.events.at(-1).data.category).toMatchObject({category:'Länder in Europa',loser:'Ben'});
+  expect(events.data.events.at(-1).data.penalties).toEqual([{player:1,kind:'Dame',amount:8,source:0,via:'card'}]);
+  await runInDurableObject(stub,instance=>expect(instance.get().state.penalties).toEqual([]));
   const file=await call(`/rooms/${r.room}/archive?round=1`,null,'test-owner-only');expect(file.status).toBe(200);expect(file.data.name).toContain('Anna_Ben');expect(file.data.summary.players[1].score).toBe(8);
   expect(file.data.roundStatistics[1].schluecke).toBe(8);
   await runInDurableObject(stub,instance=>{const row=instance.sql.exec('SELECT data FROM meta WHERE id=1').one();expect(JSON.parse(row.data).state.players[1].score).toBe(8);});
