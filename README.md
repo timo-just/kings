@@ -17,3 +17,11 @@ GitHub Pages: In den Repository-Einstellungen unter Pages als Quelle **GitHub Ac
 Bis zu sechs Spieler, 32 Karten ohne Zurücklegen, Strafvergabe, Fragekönig, Daumenkönig mit drei Einsätzen, Ende beim vierten König, kumulative Folgerunden, Verlauf, Tabellen und PNG-/Text-Export. Der Spielstand wird lokal im Browser gespeichert. Ein Glas sind 16 Schlücke. Ass, Dame und Fragekönig addieren höchstens acht Schlücke bis zum Glasende.
 
 Die erste Person beginnt; die Android-App übersprang sie durch einen vorgezogenen Spielerwechsel. Namen und Farben bleiben über leere Eingabefelder hinweg eindeutig. Statistik und Verlauf werden bei zugewiesenen Strafen sofort aktualisiert.
+# Mobile Ansicht und Kategorienhistorie
+
+Beim Öffnen des Spielleiterlinks wählt die Spielleitung ihren eigenen Spielernamen. Die Person behält die Spielsteuerung und erhält zusätzlich die persönliche Ansicht, geheime Rollen und die eigene Kategorien-Warteschlange. Der Spielleiterlink bleibt ein geheimer Zugang; die Namensauswahl ist kein Passwort-Login.
+
+Die Bereiche Spiel, Übersicht, Mein Spiel, Meine Kategorien, Kategorienhistorie und Regeln sind über Tasten erreichbar. Der Statistikgraph zeigt Gläser (16 Schlücke = 1 Glas), bis zu 16 Trinkereignisse je Ausschnitt und Vor/Zurück sowie Alles. Die Achse bleibt dabei sichtbar. Strafgründe verwenden Kartenkürzel ohne zusätzliche Rollen-Emojis.
+
+Die gemeinsame Kategorienhistorie zeigt benannte, tatsächlich gespielte Kategorien mit Einreichername, Datum und Verlierer. Alle Personen mit gültigem Spieler- oder Spielleiterlink können sie über alle Spielräume hinweg lesen. Gleiche Namen werden zusammengefasst; Namen sind keine verifizierten Konten. Die privaten Spielarchive bleiben weiterhin nur für den Besitzer sichtbar. Bestehende Ereignisse werden beim Öffnen der Kategorienhistorie in begrenzten, wiederaufnehmbaren Schritten übernommen. Beim ausdrücklichen Löschen eines Spielraums werden auch seine Einträge aus der gemeinsamen Kategorienhistorie gelöscht.
+

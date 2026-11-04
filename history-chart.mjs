@@ -17,7 +17,7 @@ export function renderHistoryChart(data){
  const max=Math.max(8,...data.players.flatMap(p=>indices.map(i=>p.history[i]||0))),x=i=>42+(positions.get(i)??0)/steps*(width-62),y=score=>270-score/max*205;
  const svg=el('svg',{id:'reasonChart',xmlns:ns,viewBox:`0 0 ${width} ${height}`,width,height,role:'img','aria-label':t('Schluckverlauf mit Strafgründen')});
  svg.append(el('rect',{width,height,fill:'#101c17'}));
- const tick=Math.max(4,Math.ceil(max/64)*16);for(let n=0;n<=max;n+=tick){svg.append(el('line',{x1:42,y1:y(n),x2:width-15,y2:y(n),stroke:'#3c5147'}),el('text',{x:3,y:y(n)+4,fill:'#c7dace','font-size':11},(n/16).toLocaleString(locale(),{maximumFractionDigits:2})));}
+ const tick=Math.max(4,Math.ceil(max/20)*4);for(let n=0;n<=max;n+=tick){svg.append(el('line',{x1:42,y1:y(n),x2:width-15,y2:y(n),stroke:'#3c5147'}),el('text',{x:3,y:y(n)+4,fill:'#c7dace','font-size':11},(n/16).toLocaleString(locale(),{maximumFractionDigits:2})));}
  svg.append(el('text',{x:3,y:22,fill:'#c7dace','font-size':12},t('Gläser')));
  indices.forEach((step,i)=>{if(i%Math.max(1,Math.ceil(steps/6))===0)svg.append(el('text',{x:x(step),y:295,fill:'#c7dace','font-size':11},changes.indexOf(step)));});
  svg.append(el('text',{x:42,y:322,fill:'#c7dace','font-size':12},t('Verlauf →')));
