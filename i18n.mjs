@@ -4,6 +4,11 @@ export let language=current==='en'?'en':'de';
 export function setLanguage(value){language=value==='en'?'en':'de';try{localStorage.setItem('kings-language',language);}catch{}if(typeof document!=='undefined')document.documentElement.lang=language;}
 export const locale=()=>language==='en'?'en-GB':'de-DE';
 const pairs={
+ 'Spiel':'Game','Übersicht':'Overview','Mein Spiel':'My game','Meine Kategorien':'My categories','Kategorienhistorie':'Category history','Wer bist du?':'Who are you?','Wähle deinen Spielernamen für die Spielleitung.':'Choose your player name to lead the game.','Noch keine Kategorien gespielt.':'No categories played yet.','Weitere laden':'Load more','Alles':'All','Ausschnitt':'Section','Vorheriger Abschnitt':'Previous section','Nächster Abschnitt':'Next section','Gläser insgesamt über den Spielverlauf':'Total glasses throughout the game',
+ 'Gespielte Kategorien aus allen Spielen, nach Namen gruppiert. Gleiche Namen gehören zur selben Liste.':'Played categories from all games, grouped by name. Identical names share one list.',
+ 'Bitte zuerst deinen Spieler wählen.':'Please choose your player first.','Nur die aktive Spielleitung darf ihren Spieler wählen.':'Only the active game leader can choose their player.',
+ '7 Nachbar · 8 selbst · 9 alle · 10 Daumenkönig · B Fragekönig · D Kategorie · 4K vierter König · A Ass':'7 neighbour · 8 yourself · 9 everyone · 10 thumb king · B question king · D category · 4K fourth king · A ace',
+
  'Rechter Nachbar':'Right neighbour','Selbst trinken':'Drink yourself','Alle trinken':'Everyone drinks','Kategorie verloren':'Lost category','Vierter König':'Fourth king','Grund nicht gespeichert':'Reason not recorded',
  'Deine Spielübersicht':'Your game overview','Statistik öffnen':'Open statistics','Runde':'Round','Schlücke insgesamt':'total sips','am Zug':'current turn','Schluckverlauf mit Strafgründen':'Sip history with penalty reasons','Verlauf →':'Progress →','Punkt antippen: Spieler, Strafgrund und Schluckzahl anzeigen.':'Tap a point to see the player, penalty reason and number of sips.','7 Nachbar · 8 selbst · 9 alle · 10/👍 Daumenkönig · B/❓ Fragekönig · D Kategorie · 4K vierter König · A Ass':'7 neighbour · 8 yourself · 9 everyone · 10/👍 thumb king · B/❓ question king · D category · 4K fourth king · A ace',
  'Nutzung übrig':'use left',
@@ -55,7 +60,7 @@ export function localize(root=document.body){
  document.documentElement.lang=language;
  const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node;
  while((node=walker.nextNode())){
-  if(node.parentElement?.closest('script,style,input,textarea,#turn,#personalName,#players,#comparison,#categoryQueue,#legend,#eventLog,#statsTitle,#roomName,#archiveList,#tables,#invitationList,#message,#outcome,#thumbOwner,#questionOwner,#personalRoles,#leaderScores,#leaderSummary,#reasonChartWrap,#reasonDetail,#reasonLegend'))continue;
+  if(node.parentElement?.closest('script,style,input,textarea,#turn,#personalName,#players,#comparison,#categoryQueue,#legend,#eventLog,#statsTitle,#roomName,#archiveList,#tables,#invitationList,#message,#outcome,#thumbOwner,#questionOwner,#personalRoles,#leaderScores,#leaderSummary,#reasonChartWrap,#reasonDetail,#reasonLegend,#categoryLibraryList,#hostPlayerChoices'))continue;
   const value=node.nodeValue,trim=value.trim();if(!trim)continue;
   const original=originals.get(node)||Object.keys(pairs).find(k=>pairs[k]===trim)||trim;if(!originals.has(node))originals.set(node,original);
   const translated=t(original);if(value.trim()!==translated)node.nodeValue=value.replace(trim,translated);

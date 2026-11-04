@@ -1,6 +1,6 @@
 export function reasonSymbol(kind,via='card'){
  const symbol={'Ass':'A','Bube':'B','Dame':'D','4. K':'4K','König':'K'}[kind]||kind;
- return via==='title'?(kind==='10'?'10👍':kind==='Bube'?'B❓':symbol):symbol;
+ return symbol;
 }
 export function timeline(players,events,initial=players.map(()=>({score:0}))){
  return players.map((p,index)=>{

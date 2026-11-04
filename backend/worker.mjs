@@ -11,9 +11,17 @@ const clean=(v,max=100)=>typeof v==='string'?v.trim().slice(0,max):'';
 function safeName(s){return s.normalize('NFKC').replace(/[^\p{L}\p{N}_-]/gu,'_').slice(0,45);}
 function filename(date,players){const d=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Berlin',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date(date));return `${d.replace(/[ :]/g,'_')}_${players.map(p=>safeName(p.name)).join('_')}`;}
 export class KingsIndex extends DurableObject{
-  constructor(ctx,env){super(ctx,env);this.sql=ctx.storage.sql;this.sql.exec('CREATE TABLE IF NOT EXISTS rooms(id TEXT PRIMARY KEY,name TEXT,created TEXT)');}
+  constructor(ctx,env){super(ctx,env);this.sql=ctx.storage.sql;this.sql.exec('CREATE TABLE IF NOT EXISTS rooms(id TEXT PRIMARY KEY,name TEXT,created TEXT)');this.sql.exec('CREATE TABLE IF NOT EXISTS categories(id INTEGER PRIMARY KEY AUTOINCREMENT,room TEXT,event INTEGER,name TEXT,category TEXT,loser TEXT,at TEXT,UNIQUE(room,event))');this.sql.exec('CREATE TABLE IF NOT EXISTS category_sync(room TEXT PRIMARY KEY,cursor INTEGER)');}
   register(id,name,created){this.sql.exec('INSERT OR IGNORE INTO rooms VALUES(?,?,?)',id,name,created);}
-  unregister(id){this.sql.exec('DELETE FROM rooms WHERE id=?',id);}
+  unregister(id){this.sql.exec('DELETE FROM rooms WHERE id=?',id);this.sql.exec('DELETE FROM categories WHERE room=?',id);this.sql.exec('DELETE FROM category_sync WHERE room=?',id);}
+  record(room,rows){if(!this.sql.exec('SELECT id FROM rooms WHERE id=?',room).toArray().length)return;for(const r of rows)this.sql.exec('INSERT OR IGNORE INTO categories(room,event,name,category,loser,at) VALUES(?,?,?,?,?,?)',room,r.id,r.giver,r.category,r.loser,r.at);}
+  async categoryHistory(after=0){
+    // Bounded, resumable migration also includes categories from earlier releases.
+    const rooms=this.sql.exec('SELECT rooms.id,COALESCE(category_sync.cursor,0) AS cursor FROM rooms LEFT JOIN category_sync ON rooms.id=category_sync.room WHERE category_sync.cursor IS NULL OR category_sync.cursor>=0 LIMIT 5').toArray();
+    for(const room of rooms){const page=await this.env.ROOMS.getByName(room.id).playedCategories(room.cursor);this.record(room.id,page.rows);this.sql.exec('INSERT OR REPLACE INTO category_sync VALUES(?,?)',room.id,page.more?page.cursor:-1);}
+    const rows=this.sql.exec('SELECT id,name,category,loser,at FROM categories WHERE id>? ORDER BY id LIMIT 200',after).toArray();
+    return {rows,cursor:rows.at(-1)?.id||after,more:rows.length===200,migrating:rooms.length>0};
+  }
   list(before='9999',limit=50){return this.sql.exec('SELECT * FROM rooms WHERE created < ? ORDER BY created DESC LIMIT ?',before,limit).toArray();}
 }
 export class KingsRoom extends DurableObject{
@@ -27,7 +35,7 @@ export class KingsRoom extends DurableObject{
   }
   get(){if(this.deleting)fail('Dieses Spiel wurde gelöscht.',410);const row=this.sql.exec('SELECT data FROM meta WHERE id=1').toArray()[0];if(!row)fail('Spielraum nicht gefunden.',404);return JSON.parse(row.data);}
   put(m){this.sql.exec('INSERT OR REPLACE INTO meta VALUES(1,?)',JSON.stringify(m));}
-  role(m,digest,owner){if(owner)return {role:'owner',me:null};if(equal(m.hostHash,digest))return {role:'host',me:null};const me=m.playerHashes.findIndex(h=>equal(h,digest));if(me>=0)return {role:'player',me};fail('Dieser Einladungslink ist ungültig.',403);}
+  role(m,digest,owner){if(owner)return {role:'owner',me:null};if(equal(m.hostHash,digest))return {role:'host',me:m.hostPlayer??null};const me=m.playerHashes.findIndex(h=>equal(h,digest));if(me>=0)return {role:'player',me};fail('Dieser Einladungslink ist ungültig.',403);}
   initialize(id,names,credentials,device){
     if(this.sql.exec('SELECT id FROM meta').toArray().length)fail('Spielraum existiert bereits.',409);
     const state=newGame(names),created=new Date().toISOString();
@@ -37,6 +45,7 @@ export class KingsRoom extends DurableObject{
   startRound(m){const at=new Date().toISOString();this.sql.exec('INSERT INTO rounds(id,name,started,summary,initial) VALUES(?,?,?,?,?)',m.state.round,filename(at,m.state.players),at,JSON.stringify(m.state),JSON.stringify(m.state.players));}
   event(m,kind,lines){this.sql.exec('INSERT INTO events(round,at,kind,data) VALUES(?,?,?,?)',m.state.round,new Date().toISOString(),kind,JSON.stringify({lines,scores:m.state.players.map(p=>p.score),penalties:m.state.penalties||[],category:m.state.categoryResults?.at(-1)||null}));}
   view(m,actor){
+    if(actor.role==='host')actor={...actor,me:m.hostPlayer??null};
     const state=structuredClone(m.state);state.deck=Array(state.deck.length).fill(null);state.log=[];state.categoryResults=[];state.penalties=[];
     if(actor.role==='player'){
       if(state.question!==actor.me)state.question=null;
@@ -48,14 +57,18 @@ export class KingsRoom extends DurableObject{
     return out;
   }
   read(digest,owner){const m=this.get();return this.view(m,this.role(m,digest,owner));}
-  action(digest,owner,input,device){
+  async action(digest,owner,input,device){
     const m=this.get(),actor=this.role(m,digest,owner),s=m.state;
     if(!input||typeof input!=='object')fail('Ungültige Aktion.');
-    if(input.type==='useTitle'){
-      if(actor.role!=='player')fail('Bitte den persönlichen Spielerlink verwenden.',403);
+    if(input.type==='hostPlayer'){
+      if(actor.role!=='host'||m.controller!==device)fail('Nur die aktive Spielleitung darf ihren Spieler wählen.',403);
+      if(!Number.isInteger(input.player)||!s.players[input.player])fail('Ungültiger Spieler.');
+      m.hostPlayer=input.player;actor.me=input.player;
+    }else if(input.type==='useTitle'){
+      if(actor.me===null)fail('Bitte zuerst deinen Spieler wählen.',403);
       if(!useTitle(s,actor.me,input.kind,input.player))fail('Diese Rolle ist nicht mehr verfügbar oder die Auswahl ist ungültig.',403);
     }else if(input.type==='categoryQueue'){
-      if(actor.role!=='player')fail('Nur Spieler können ihre eigene Warteschlange bearbeiten.',403);
+      if(actor.me===null)fail('Bitte zuerst deinen Spieler wählen.',403);
       if(input.revision!==m.revision)fail('Die Warteschlange wurde aktualisiert. Bitte erneut versuchen.',409);
       const queue=m.categories[actor.me];
       if(input.operation==='add'){const name=clean(input.category);if(!name)fail('Bitte eine Kategorie eingeben.');if(queue.length>=30)fail('Maximal 30 wartende Kategorien.');queue.push(name);}
@@ -65,7 +78,7 @@ export class KingsRoom extends DurableObject{
         else{if(!Number.isInteger(input.to)||input.to<0||input.to>=queue.length)fail('Ungültige Position.');queue.splice(input.to,0,queue.splice(input.index,1)[0]);}
       }else fail('Ungültige Warteschlangen-Aktion.');
     }else if(input.type==='categoryList'){
-      if(actor.role!=='player')fail('Bitte den persönlichen Spielerlink verwenden.',403);
+      if(actor.me===null)fail('Bitte zuerst deinen Spieler wählen.',403);
       if(!Array.isArray(input.categories)||input.categories.length>30)fail('Maximal 30 Kategorien.');
       m.categories[actor.me]=[...new Set(input.categories.map(v=>clean(v)).filter(Boolean))];
     }else{
@@ -75,7 +88,7 @@ export class KingsRoom extends DurableObject{
         if(m.controller!==device)fail('Ein anderes Gerät leitet dieses Spiel. Übernimm zuerst ausdrücklich die Spielleitung.',409);
         if(input.revision!==m.revision)fail('Der Spielstand hat sich geändert. Bitte erneut versuchen.',409);
         let ok=true;
-        if(input.type==='draw'){ok=draw(s);if(ok&&s.pending==='Dame'){s.category=m.categories[s.turn].shift()||'';}}
+        if(input.type==='draw'){if(actor.role==='host'&&actor.me===null)fail('Bitte zuerst deinen Spieler wählen.',403);ok=draw(s);if(ok&&s.pending==='Dame'){s.category=m.categories[s.turn].shift()||'';}}
         else if(input.type==='assign'){if(!Number.isInteger(input.player)||!s.players[input.player])fail('Ungültiger Spieler.');ok=assign(s,input.player);}
         else if(input.type==='mode')ok=['10','Bube'].includes(input.mode)&&selectMode(s,input.mode);
         else if(input.type==='category'){if(s.pending!=='Dame')fail('Keine Kategorie offen.');s.category=clean(input.category);}
@@ -94,13 +107,16 @@ export class KingsRoom extends DurableObject{
       // SQL events hold the complete time series; live state stays small over months.
       m.state.players.forEach(p=>p.history=[p.score]);m.state.categoryResults=[];m.state.penalties=[];this.put(m);
     });
-    this.broadcast(m);return this.view(m,actor);
+    this.broadcast(m);
+    if(input.type==='assign'){const row=this.sql.exec('SELECT id,at,data FROM events ORDER BY id DESC LIMIT 1').toArray()[0],category=JSON.parse(row.data).category;if(category?.category)await this.env.INDEX.getByName('catalogue').record(m.id,[{id:row.id,at:row.at,...category}]);}
+    return this.view(m,actor);
   }
   statistics(digest,owner,before=0,round=null){
     const m=this.get(),actor=this.role(m,digest,owner);if(round!==null&&actor.role!=='owner')fail('Die Spielhistorie ist nur für den Besitzer sichtbar.',403);
     const rows=round===null?this.sql.exec('SELECT * FROM events WHERE id>? ORDER BY id LIMIT 1000',before).toArray():this.sql.exec('SELECT * FROM events WHERE round=? AND id>? ORDER BY id LIMIT 1000',round,before).toArray();
     return {events:rows.map(r=>({...r,data:JSON.parse(r.data)})),cursor:rows.at(-1)?.id||before,more:rows.length===1000};
   }
+  playedCategories(after=0){const rows=this.sql.exec("SELECT id,at,data FROM events WHERE id>? AND kind='assign' ORDER BY id LIMIT 1000",after).toArray();return {rows:rows.flatMap(r=>{const c=JSON.parse(r.data).category;return c?.category?[{id:r.id,at:r.at,...c}]:[];}),cursor:rows.at(-1)?.id||after,more:rows.length===1000};}
   rounds(digest,owner){const m=this.get();this.role(m,digest,owner);if(!owner)fail('Nur für den Besitzer.',403);return this.sql.exec('SELECT id,name,started,ended FROM rounds ORDER BY id DESC').toArray();}
   archive(digest,owner,round){
     const m=this.get();this.role(m,digest,owner);if(!owner)fail('Nur für den Besitzer.',403);
@@ -154,9 +170,10 @@ export default {
       }
       if(request.method==='GET'){
         if(url.pathname==='/admin/rooms'){if(!owner)fail('Nur für den Besitzer.',403);return json(await env.INDEX.getByName('catalogue').list(url.searchParams.get('before')||'9999'));}
-        const match=url.pathname.match(/^\/rooms\/([a-f0-9-]{36})(?:\/(stats|rounds|archive|live))?$/);
+        const match=url.pathname.match(/^\/rooms\/([a-f0-9-]{36})(?:\/(stats|rounds|archive|live|categories))?$/);
         if(match){
           const room=env.ROOMS.getByName(match[1]);
+          if(match[2]==='categories'){await room.read(digest,owner);return json(await env.INDEX.getByName('catalogue').categoryHistory(Math.max(0,Number(url.searchParams.get('after'))||0)));}
           if(match[2]==='live'){if(request.headers.get('Upgrade')?.toLowerCase()!=='websocket'||!protocols.includes('kings'))fail('WebSocket erforderlich.',426);const headers=new Headers(request.headers);headers.set('X-Kings-Digest',digest);headers.set('X-Kings-Owner',owner?'yes':'no');return await room.fetch(new Request(request,{headers}));}
           if(match[2]==='stats'){const round=url.searchParams.has('round')?Number(url.searchParams.get('round')):null;return json(await room.statistics(digest,owner,Math.max(0,Number(url.searchParams.get('after'))||0),round));}
           if(match[2]==='rounds')return json(await room.rounds(digest,owner));

@@ -6,7 +6,7 @@ async function call(path,body,key='',device='host-device'){
   const req=new Request('https://api.test'+path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+key,'X-Kings-Device':device,...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
   const res=await worker.fetch(req,env);return {status:res.status,data:await res.json()};
 }
-async function room(names=['Anna','Ben']){const r=await call('/rooms',{names});expect(r.status).toBe(201);return r.data;}
+async function room(names=['Anna','Ben']){const r=await call('/rooms',{names});expect(r.status).toBe(201);await runInDurableObject(env.ROOMS.getByName(r.data.room),instance=>{const m=instance.get();m.hostPlayer=0;instance.put(m);});return r.data;}
 it('only the title holder sees and uses their role, with exactly three or one uses',async()=>{
  const r=await room();const stub=env.ROOMS.getByName(r.room);
  await runInDurableObject(stub,instance=>{const m=instance.get();m.state.thumb=0;m.state.thumbUses=3;m.state.question=1;m.state.pending='Dame';m.state.category='Filme';instance.put(m);});
@@ -72,6 +72,26 @@ it('records optional category and loser; persists scores and complete round file
 it('participants edit only their own category list',async()=>{
   const r=await room();
   const updated=await call(`/rooms/${r.room}/action`,{type:'categoryList',categories:['Filme','Filme','Tiere'],player:1},r.invitations[0]);expect(updated.status).toBe(200);expect(updated.data.categories).toEqual([['Filme','Tiere'],[]]);
+});
+it('requires a host player and gives the leader their own queue and title actions',async()=>{
+ const r=(await call('/rooms',{names:['Leader','Guest']})).data;
+ expect((await call(`/rooms/${r.room}/action`,{type:'draw',revision:0},r.hostToken)).status).toBe(403);
+ expect((await call(`/rooms/${r.room}/action`,{type:'hostPlayer',player:0},r.invitations[1])).status).toBe(403);
+ const selected=await call(`/rooms/${r.room}/action`,{type:'hostPlayer',player:1},r.hostToken);expect(selected.data.me).toBe(1);
+ const queue=await call(`/rooms/${r.room}/action`,{type:'categoryQueue',operation:'add',category:'Leader category',revision:selected.data.revision},r.hostToken);expect(queue.data.categories).toEqual([[],['Leader category']]);
+ expect((await call('/rooms/'+r.room,null,r.hostToken)).data.me).toBe(1);
+ await runInDurableObject(env.ROOMS.getByName(r.room),instance=>{const m=instance.get();m.state.thumb=1;m.state.thumbUses=3;instance.put(m);});
+ expect((await call(`/rooms/${r.room}/action`,{type:'useTitle',kind:'10',player:0},r.hostToken)).data.state.players[0].score).toBe(1);
+});
+it('shares played categories across games by submitting name, including legacy events, without opening private archives',async()=>{
+ const a=await room(['History submitter','Loser']),b=await room(['Another player']);
+ await runInDurableObject(env.ROOMS.getByName(a.room),instance=>{const m=instance.get();m.state.pending='Dame';m.state.category='Unique old category';instance.put(m);instance.sql.exec('INSERT INTO events(round,at,kind,data) VALUES(?,?,?,?)',1,new Date().toISOString(),'assign',JSON.stringify({category:{giver:'History submitter',category:'Legacy category',loser:'Loser'}}));});
+ expect((await call(`/rooms/${a.room}/action`,{type:'assign',player:1,revision:0},a.hostToken)).status).toBe(200);
+ const history=await call(`/rooms/${b.room}/categories`,null,b.invitations[0]);expect(history.status).toBe(200);expect(history.data.rows.filter(r=>r.name==='History submitter').map(r=>r.category)).toEqual(expect.arrayContaining(['Unique old category','Legacy category']));
+ expect((await call(`/rooms/${b.room}/categories`)).status).toBe(403);
+ expect((await call(`/rooms/${a.room}/archive?round=1`,null,b.invitations[0])).status).toBe(403);
+ await call(`/rooms/${a.room}/abort`,{confirm:'delete-room'},a.hostToken);
+ expect((await call(`/rooms/${b.room}/categories`,null,b.invitations[0])).data.rows.some(r=>r.name==='History submitter')).toBe(false);
 });
 it('persists old rounds when continuing the same room',async()=>{
   const r=await room();await runInDurableObject(env.ROOMS.getByName(r.room),instance=>{const m=instance.get();m.state.over=true;m.state.players[0].score=20;instance.put(m);});

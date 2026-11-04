@@ -16,7 +16,7 @@ function save(){if(online)return;try{localStorage.setItem(key,JSON.stringify(sta
 function openSetup(){ $('home').hidden=true; $('setup').hidden=false;$('game').hidden=true;$('results').hidden=true;$('edit').hidden=true;$('roomOpen').hidden=!state;$('statsOpen').hidden=!state;$('resume').hidden=!state;$('lastRoom').hidden=!lastRoom(); $('fields').querySelectorAll('input').forEach((el,i)=>el.value=state?.players.find(p=>p.slot===i)?.name||''); }
 $('names').onsubmit=async e=>{e.preventDefault(); try{const names=[...$('fields').querySelectorAll('input')].map(el=>el.value);newGame(names);if($('onlineSetup').checked){const view=await createRoom(names);await joinOnline({room:view.room,key:view.hostToken});$('roomOpen').click();}else{leave();state=newGame(names);save();render();}$('error').textContent='';}catch(err){$('error').textContent=gameText(err.message);}};
 $('resume').onclick=()=>render();$('edit').onclick=openSetup;
-function showHome(){leave();state=null;for(const d of document.querySelectorAll('dialog[open]'))d.close();$('home').hidden=false;for(const id of ['setup','game','results','personal','leaderOverview','connection','statsOpen','roomOpen','edit'])$(id).hidden=true;$('menuContinue').hidden=!lastRoom();$('languageSelect').value=language;localize();}
+function showHome(){leave();state=null;for(const d of document.querySelectorAll('dialog[open]'))d.close();$('home').hidden=false;for(const id of ['setup','game','results','personal','leaderOverview','connection','statsOpen','roomOpen','edit','viewNav','categoryLibrary','rulesPanel'])$(id).hidden=true;$('menuContinue').hidden=!lastRoom();$('languageSelect').value=language;localize();}
 $('homeOpen').onclick=showHome;
 $('menuNew').onclick=()=>{leave();state=null;openSetup();localize();};
 $('menuContinue').onclick=()=>joinOnline(lastRoom()).catch(e=>notice(e.message));
@@ -34,7 +34,7 @@ function render(){
   $('home').hidden=true;
   renderOnline();
   $('setup').hidden=true;$('statsOpen').hidden=false;$('edit').hidden=!!online;$('game').hidden=state.over;$('results').hidden=!state.over;
-  if(state.over){results();$('next').hidden=!!online&&roomView.role==='player';localize();return;}
+  if(state.over){results();$('next').hidden=!!online&&roomView.role==='player';renderNavigation();localize();return;}
   $('kings').textContent=`Kings: ${state.kings}/4`;$('remaining').textContent=`${32-state.deck.length}/32`;
   $('turn').textContent=state.players[state.turn].name;
   const rank=cardRank(state.card?.rank);
@@ -47,7 +47,7 @@ function render(){
   $('players').replaceChildren();state.players.forEach((p,i)=>{const b=document.createElement('button');b.style.setProperty('--player',colors[p.slot]);b.classList.toggle('current',i===state.turn);b.innerHTML=`${escape(p.name)}<small>${Math.floor(p.score/16)} ${t('Gläser')} · ${((16-p.score%16)*6.25).toLocaleString(locale())} %</small>`;b.setAttribute('aria-label',`${p.name}, ${p.score} ${t('Schlücke')}`);b.disabled=!!online&&roomView.role==='player';b.onclick=()=>act({type:'assign',player:i});$('players').append(b);});
   $('categoryEntry').hidden=state.pending!=='Dame'||!!online&&roomView.role==='player';
   if(document.activeElement!==$('categoryName'))$('categoryName').value=state.category||'';
-  localize();
+  renderNavigation();localize();
 }
 function table(title,keys,field,data=state){return `<h2>${t(title)}</h2><div class="table-wrap"><table><thead><tr><th>${t('Karte')}</th>${data.players.map(p=>`<th>${escape(p.name)}</th>`).join('')}</tr></thead><tbody>${keys.map(k=>`<tr><th>${t(k==='4. K'?'4. König':k)}</th>${data.players.map(p=>`<td>${p[field]?.[k]||0}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;}
 function results(){
@@ -60,7 +60,7 @@ function statistics(data=state){
   $('tables').innerHTML=table('Verteilte Karten / Strafen',keys,'distributed',data)+table('Erhaltene Karten / Strafen',keys,'received',data);
   if(data.categoryResults?.length)$('tables').insertAdjacentHTML('beforeend',`<h2>${t('Kategorien und Verlierer')}</h2><div class="table-wrap"><table><thead><tr><th>${t('Kategorie')}</th><th>${t('Bestimmt von')}</th><th>${t('Verloren von')}</th></tr></thead><tbody>${data.categoryResults.map(c=>`<tr><th>${c.category?escape(c.category):t('(ohne Namen)')}</th><td>${escape(c.giver)}</td><td>${escape(c.loser)}</td></tr>`).join('')}</tbody></table></div>`);
   $('legacy').textContent=data.players.some(p=>!p.distributed)?'Verteilte Strafen aus älteren Spielständen wurden noch nicht erfasst. Die Zählung beginnt mit diesem Update.':'';
-  $('legend').innerHTML=data.players.map(p=>`<span style="--player:${colors[p.slot]}"><i></i>${escape(p.name)} · ${p.score} ${t('Schlücke')}</span>`).join('');
+  $('legend').innerHTML=data.players.map(p=>`<span style="--player:${colors[p.slot]}"><i></i>${escape(p.name)} · ${(p.score/16).toLocaleString(locale(),{maximumFractionDigits:2})} ${t('Gläser')}</span>`).join('');
   $('eventLog').textContent=data.log.length?data.log.map((line,i)=>`${String(i+1).padStart(3,'0')}  ${translateLogLine(line)}`).join('\n'):t('Noch keine Karten gezogen.');
   renderHistoryChart(data);
   localize();
@@ -103,10 +103,10 @@ function renderOnline(){
     $('leaderScores').replaceChildren();
     state.players.forEach((p,index)=>{const row=document.createElement('div');row.className='leader-player';row.style.setProperty('--player',colors[p.slot]);row.innerHTML=`<span>${escape(p.name)}${index===state.turn&&!state.over?' · '+t('am Zug'):''}</span><strong>${p.score} ${t('Schlücke')}</strong><small>${(p.score/16).toLocaleString(locale(),{maximumFractionDigits:2})} ${t('Gläser')}</small>`;$('leaderScores').append(row);});
   }
-  $('roomOpen').hidden=!state;$('personal').hidden=!player;$('connection').hidden=!online;$('edit').hidden=!!online;
+  $('roomOpen').hidden=!state;$('personal').hidden=roomView?.me==null;$('connection').hidden=!online;$('edit').hidden=!!online;
   for(const id of ['draw','thumb','question'])$(id).hidden=player;
   $('lastRoom').hidden=!lastRoom();
-  if(player){const p=state.players[roomView.me];$('personalName').textContent=p.name;$('personalScore').textContent=`${p.score} ${t('Schlücke')} · ${(p.score/16).toLocaleString(locale(),{maximumFractionDigits:2})} ${t('Gläser')}`;
+  if(online&&roomView.me!=null){const p=state.players[roomView.me];$('personalName').textContent=p.name;$('personalScore').textContent=`${(p.score/16).toLocaleString(locale(),{maximumFractionDigits:2})} ${t('Gläser')}`;
     renderPersonalRoles();
     $('comparison').innerHTML=state.players.map(q=>`<p style="--player:${colors[q.slot]}"><span class="dot"></span>${escape(q.name)} <strong>${q.score} ${t('Schlücke')}</strong></p>`).join('');
     renderQueue();
@@ -135,6 +135,7 @@ async function loadStatistics(){if(!online)return;const events=await eventPages(
 let statsLoading=false;async function refreshStats(){if(statsLoading)return;statsLoading=true;try{await loadStatistics();if(!archivedStatistics)statistics();}catch(e){notice(e.message);}finally{statsLoading=false;}}
 function copyLink(link){navigator.clipboard.writeText(link).then(()=>notice('Link kopiert')).catch(()=>{prompt('Link kopieren:',link);});}
 $('roomOpen').onclick=()=>{
+  if($('hostPlayerDialog')?.open)return;
   $('roomName').textContent=online?roomView.name:'Dieses Spiel läuft bisher nur auf diesem Gerät.';
   $('createOnline').hidden=!!online;$('exitRoom').hidden=!online;$('takeover').hidden=!online||roomView.role==='player'||roomView.controller===deviceId;
   $('abortGame').hidden=!!online&&!(roomView.role==='owner'||roomView.role==='host'&&roomView.controller===deviceId);
@@ -184,6 +185,38 @@ $('archiveStatus').insertAdjacentHTML('afterend','<label class="import-archive">
 $('archiveImport').onchange=async e=>{try{const file=e.target.files[0];if(!file)return;if(file.size>10*1024*1024)throw Error('Die Datei ist zu groß (maximal 10 MB).');openArchive(JSON.parse(await file.text()));}catch(err){$('archiveStatus').textContent=err.message;}finally{e.target.value='';}};
 $('archiveOpen').onclick=()=>{$('archiveDialog').showModal();showArchive();localize();};$('archiveClose').onclick=()=>$('archiveDialog').close();$('archiveMore').onclick=()=>showArchive(true);
 $('ownerLogin').onsubmit=e=>{e.preventDefault();ownerCredential=$('ownerKey').value.trim();try{localStorage.setItem('kings-owner',JSON.stringify(ownerCredential));}catch{}$('ownerKey').value='';showArchive();};
+// Compact screens replace the long stacked mobile layout.
+let activeScreen='play',hostLoggedRoom=null;
+const rules=document.querySelector('main>details');rules.id='rulesPanel';
+$('game').before(Object.assign(document.createElement('nav'),{id:'viewNav'}));
+$('personalScore').insertAdjacentHTML('afterend','<div id="personalRoles" aria-live="polite"></div>');
+const categories=document.createElement('section');categories.id='myCategories';
+$('categoryPreferences').before(categories);
+for(const node of [$('categoryPreferences'),$('categoryPreferences').nextElementSibling,$('categoryQueue'),$('queueEmpty')])if(node&&node!==categories)categories.append(node);
+document.querySelector('main').append(Object.assign(document.createElement('section'),{id:'categoryLibrary',hidden:true}));
+$('categoryLibrary').innerHTML='<h1>Kategorienhistorie</h1><p>Gespielte Kategorien aus allen Spielen, nach Namen gruppiert. Gleiche Namen gehören zur selben Liste.</p><div id="categoryLibraryList"></div><button id="moreCategories">Weitere laden</button>';
+let libraryCursor=0,libraryRows=[],libraryLoading=false;
+async function loadCategoryLibrary(reset=false){if(libraryLoading||!online)return;libraryLoading=true;try{if(reset){libraryCursor=0;libraryRows=[];}let migration=true;for(let n=0;n<20&&migration;n++){const page=await request(`/rooms/${online.room}/categories?after=${libraryCursor}`);libraryRows.push(...page.rows);libraryCursor=page.cursor;migration=page.migrating;$('moreCategories').hidden=!page.more&&!page.migrating;if(page.more)break;}
+ const groups=new Map();for(const r of libraryRows){if(!groups.has(r.name))groups.set(r.name,[]);groups.get(r.name).push(r);}$('categoryLibraryList').replaceChildren();for(const [name,rows]of [...groups].sort(([a],[b])=>a.localeCompare(b,locale()))){const box=document.createElement('details');box.open=true;const title=document.createElement('summary');title.textContent=name;box.append(title);const list=document.createElement('ul');for(const r of rows.sort((a,b)=>b.at.localeCompare(a.at))){const li=document.createElement('li');li.textContent=`${r.category} · ${new Date(r.at).toLocaleDateString(locale())} · ${t('Verloren von')}: ${r.loser}`;list.append(li);}box.append(list);$('categoryLibraryList').append(box);}if(!groups.size)$('categoryLibraryList').textContent=t('Noch keine Kategorien gespielt.');
+}catch(e){notice(e.message);}finally{libraryLoading=false;localize();}}
+$('moreCategories').onclick=()=>loadCategoryLibrary();
+document.body.insertAdjacentHTML('beforeend','<dialog id="hostPlayerDialog"><h1>Wer bist du?</h1><p>Wähle deinen Spielernamen für die Spielleitung.</p><div id="hostPlayerChoices"></div></dialog>');
+$('hostPlayerDialog').addEventListener('cancel',e=>e.preventDefault());
+function renderNavigation(){
+ if(!state||!online)return;
+ const host=roomView.role!=='player',identified=roomView.me!=null;
+ if(!host&&activeScreen==='play')activeScreen='personal';
+ if(roomView.role==='host'&&hostLoggedRoom!==online.room&&roomView.controller===deviceId){$('hostPlayerChoices').replaceChildren();state.players.forEach((p,i)=>{const b=document.createElement('button');b.textContent=p.name;b.onclick=async()=>{try{const view=await command({type:'hostPlayer',player:i});hostLoggedRoom=online.room;applyOnline(view);$('hostPlayerDialog').close();if(state.deck.length===32)$('roomOpen').click();}catch(e){notice(e.message);}};$('hostPlayerChoices').append(b);});if(!$('hostPlayerDialog').open)$('hostPlayerDialog').showModal();}
+ $('viewNav').hidden=false;$('viewNav').replaceChildren();
+ const screens=[...(host?[['play','Spiel'],['overview','Übersicht']]:[]),...(identified?[['personal','Mein Spiel'],['categories','Meine Kategorien']]:[]),['library','Kategorienhistorie'],['rules','Spielregeln']];
+ for(const [id,label]of screens){const b=document.createElement('button');b.textContent=t(label);b.setAttribute('aria-pressed',activeScreen===id);b.onclick=()=>{activeScreen=id;renderNavigation();if(id==='library')loadCategoryLibrary(true);};$('viewNav').append(b);}
+ $('leaderOverview').hidden=activeScreen!=='overview';$('game').hidden=activeScreen!=='play'||state.over;$('results').hidden=activeScreen!=='play'||!state.over;
+ $('personal').hidden=!['personal','categories'].includes(activeScreen)||!identified;
+ for(const id of ['personalScore','personalRoles','comparison'])$(id).hidden=activeScreen!=='personal';
+ $('myCategories').hidden=activeScreen!=='categories';
+ $('categoryLibrary').hidden=activeScreen!=='library';rules.hidden=activeScreen!=='rules';rules.open=activeScreen==='rules';
+ localize();
+}
 const initial=contextFromLink();
 if(initial?.owner){ownerCredential=initial.owner;showHome();$('archiveOpen').click();}
 else if(initial?.room)joinOnline(initial).catch(e=>{openSetup();notice(e.message);});
