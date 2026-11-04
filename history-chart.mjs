@@ -16,11 +16,11 @@ export function renderHistoryChart(data){
  const steps=Math.max(1,indices.length-1),width=Math.max(300,Math.min(760,wrap.clientWidth||340)),height=340;
  const max=Math.max(8,...data.players.flatMap(p=>indices.map(i=>p.history[i]||0))),x=i=>42+(positions.get(i)??0)/steps*(width-62),y=score=>270-score/max*205;
  const svg=el('svg',{id:'reasonChart',xmlns:ns,viewBox:`0 0 ${width} ${height}`,width,height,role:'img','aria-label':t('Schluckverlauf mit Strafgründen')});
- svg.append(el('rect',{width,height,fill:'#101c17'}));
- const tick=Math.max(4,Math.ceil(max/20)*4);for(let n=0;n<=max;n+=tick){svg.append(el('line',{x1:42,y1:y(n),x2:width-15,y2:y(n),stroke:'#3c5147'}),el('text',{x:3,y:y(n)+4,fill:'#c7dace','font-size':11},(n/16).toLocaleString(locale(),{maximumFractionDigits:2})));}
- svg.append(el('text',{x:3,y:22,fill:'#c7dace','font-size':12},t('Gläser')));
- indices.forEach((step,i)=>{if(i%Math.max(1,Math.ceil(steps/6))===0)svg.append(el('text',{x:x(step),y:295,fill:'#c7dace','font-size':11},changes.indexOf(step)));});
- svg.append(el('text',{x:42,y:322,fill:'#c7dace','font-size':12},t('Verlauf →')));
+ svg.append(el('rect',{width,height,fill:'#191919'}));
+ const tick=Math.max(4,Math.ceil(max/20)*4);for(let n=0;n<=max;n+=tick){svg.append(el('line',{x1:42,y1:y(n),x2:width-15,y2:y(n),stroke:'#484848'}),el('text',{x:3,y:y(n)+4,fill:'#cccccc','font-size':11},(n/16).toLocaleString(locale(),{maximumFractionDigits:2})));}
+ svg.append(el('text',{x:3,y:22,fill:'#cccccc','font-size':12},t('Gläser')));
+ indices.forEach((step,i)=>{if(i%Math.max(1,Math.ceil(steps/6))===0)svg.append(el('text',{x:x(step),y:295,fill:'#cccccc','font-size':11},changes.indexOf(step)));});
+ svg.append(el('text',{x:42,y:322,fill:'#cccccc','font-size':12},t('Verlauf →')));
  const occupied=new Map();
  data.players.forEach((p,index)=>{
   const color=colors[p.slot]||colors[index%colors.length];svg.append(el('polyline',{points:indices.map(i=>`${x(i)},${y(p.history[i]||0)}`).join(' '),fill:'none',stroke:color,'stroke-width':2}));
@@ -30,8 +30,8 @@ export function renderHistoryChart(data){
    const detail=`${p.name}: +${amount} ${t('Schlücke')} · ${reasons} · ${mark.score} ${t('Schlücke')} · ${new Date(mark.at).toLocaleString(locale())}`;
    const symbol=mark.symbol.replaceAll('👍','').replaceAll('❓','');
    const group=el('g',{tabindex:0,role:'button','aria-label':detail,'data-reason':symbol,style:'cursor:pointer'});
-   group.append(el('title',{},detail),el('circle',{cx:px,cy:py,r:4,fill:color,stroke:'#101c17','stroke-width':1}),el('line',{x1:px,y1:py-4,x2:px,y2:labelY+3,stroke:color,'stroke-width':1}));
-   const boxWidth=Math.max(18,Array.from(symbol).length*7+8);group.append(el('rect',{x:px-boxWidth/2,y:labelY-12,width:boxWidth,height:17,rx:4,fill:'#192d23',stroke:color}),el('text',{x:px,y:labelY,fill:color,'font-family':'Arial, sans-serif','font-size':11,'font-weight':'bold','text-anchor':'middle'},symbol));
+   group.append(el('title',{},detail),el('circle',{cx:px,cy:py,r:4,fill:color,stroke:'#191919','stroke-width':1}),el('line',{x1:px,y1:py-4,x2:px,y2:labelY+3,stroke:color,'stroke-width':1}));
+   const boxWidth=Math.max(18,Array.from(symbol).length*7+8);group.append(el('rect',{x:px-boxWidth/2,y:labelY-12,width:boxWidth,height:17,rx:4,fill:'#292929',stroke:color}),el('text',{x:px,y:labelY,fill:color,'font-family':'Arial, sans-serif','font-size':11,'font-weight':'bold','text-anchor':'middle'},symbol));
    const show=()=>{document.getElementById('reasonDetail').textContent=detail;};group.addEventListener('click',show);group.addEventListener('focus',show);group.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();show();}});svg.append(group);
   }
  });
